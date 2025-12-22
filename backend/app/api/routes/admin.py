@@ -1,0 +1,548 @@
+from typing import Optional
+import os
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query, UploadFile, File
+from sqlalchemy.orm import Session
+
+from app.api.admin_deps import clear_admin_cookie, get_admin_user, set_admin_cookie
+from app.api.deps import get_db
+from app.core.config import get_settings
+from app.models import catalog as cat_models
+from app.models.order import Order, OrderStatus
+from app.models.user import User
+from app.models.loyalty import LoyaltyAccount
+from app.schemas import admin as admin_schemas
+
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/login")
+def admin_login(payload: admin_schemas.AdminLoginRequest, response: Response):
+    settings = get_settings()
+    if payload.username != settings.admin_username or payload.password != settings.admin_password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    set_admin_cookie(response, username=payload.username)
+    return {"authenticated": True, "username": payload.username}
+
+
+@router.post("/logout")
+def admin_logout(response: Response):
+    clear_admin_cookie(response)
+    return {"logged_out": True}
+
+
+@router.get("/session")
+def admin_session(user=Depends(get_admin_user)):
+    return {"authenticated": True, "username": user["username"]}
+
+
+# -------- Catalog CRUD --------
+@router.get("/categories")
+def list_categories(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.Category).order_by(cat_models.Category.sort_order).all()
+
+
+@router.post("/categories")
+def create_category(payload: admin_schemas.CategoryCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.Category(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/categories/{category_id}")
+def update_category(category_id: int, payload: admin_schemas.CategoryUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.Category).filter(cat_models.Category.id == category_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Category not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/categories/{category_id}")
+def delete_category(category_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.Category).filter(cat_models.Category.id == category_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Category not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/products")
+def list_products(category_id: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    q = db.query(cat_models.Product)
+    if category_id:
+        q = q.filter(cat_models.Product.category_id == category_id)
+    return q.order_by(cat_models.Product.sort_order).all()
+
+
+@router.post("/products")
+def create_product(payload: admin_schemas.ProductCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.Product(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/products/{product_id}")
+def update_product(product_id: int, payload: admin_schemas.ProductUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.Product).filter(cat_models.Product.id == product_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Product not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/products/{product_id}")
+def delete_product(product_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.Product).filter(cat_models.Product.id == product_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/product_sizes")
+def list_product_sizes(product_id: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    q = db.query(cat_models.ProductSize)
+    if product_id:
+        q = q.filter(cat_models.ProductSize.product_id == product_id)
+    return q.order_by(cat_models.ProductSize.sort_order).all()
+
+
+@router.post("/product_sizes")
+def create_product_size(payload: admin_schemas.ProductSizeCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.ProductSize(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/product_sizes/{size_id}")
+def update_product_size(size_id: int, payload: admin_schemas.ProductSizeUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.ProductSize).filter(cat_models.ProductSize.id == size_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Size not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/product_sizes/{size_id}")
+def delete_product_size(size_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.ProductSize).filter(cat_models.ProductSize.id == size_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Size not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/modification_groups")
+def list_modification_groups(product_id: Optional[int] = None, category_id: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    q = db.query(cat_models.ModificationGroup)
+    if product_id:
+        q = q.join(cat_models.ModificationGroupProduct).filter(cat_models.ModificationGroupProduct.product_id == product_id)
+    return q.order_by(cat_models.ModificationGroup.sort_order).all()
+
+
+@router.post("/modification_groups")
+def create_modification_group(payload: admin_schemas.ModificationGroupCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    type_value = str(payload.type or "single").lower()
+    if type_value not in ("single", "multiple"):
+        raise HTTPException(status_code=400, detail="Invalid modification group type")
+    try:
+        mod_type = cat_models.ModificationType(type_value)
+    except ValueError:
+        mod_type = cat_models.ModificationType.SINGLE
+    obj = cat_models.ModificationGroup(
+        name=payload.name,
+        min_count=payload.min_count,
+        max_count=payload.max_count,
+        type=mod_type,
+        sort_order=payload.sort_order,
+        is_active=payload.is_active,
+    )
+    if payload.product_ids:
+        products = db.query(cat_models.Product).filter(cat_models.Product.id.in_(payload.product_ids)).all()
+        obj.products = products
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/modification_groups/{group_id}")
+def update_modification_group(group_id: int, payload: admin_schemas.ModificationGroupUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.ModificationGroup).filter(cat_models.ModificationGroup.id == group_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Group not found")
+    data = payload.model_dump(exclude_unset=True)
+    product_ids = data.pop("product_ids", None)
+    if "type" in data and data["type"]:
+        t = str(data["type"]).lower()
+        if t not in ("single", "multiple"):
+            raise HTTPException(status_code=400, detail="Invalid modification group type")
+        try:
+            data["type"] = cat_models.ModificationType(t)
+        except ValueError:
+            data["type"] = cat_models.ModificationType.SINGLE
+    for k, v in data.items():
+        setattr(obj, k, v)
+    if product_ids is not None:
+        products = db.query(cat_models.Product).filter(cat_models.Product.id.in_(product_ids)).all()
+        obj.products = products
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/modification_groups/{group_id}")
+def delete_modification_group(group_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.ModificationGroup).filter(cat_models.ModificationGroup.id == group_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Group not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/modification_options")
+def list_modification_options(group_id: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    q = db.query(cat_models.ModificationOption)
+    if group_id:
+        q = q.filter(cat_models.ModificationOption.group_id == group_id)
+    return q.order_by(cat_models.ModificationOption.sort_order).all()
+
+
+@router.post("/modification_options")
+def create_modification_option(payload: admin_schemas.ModificationOptionCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.ModificationOption(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/modification_options/{option_id}")
+def update_modification_option(option_id: int, payload: admin_schemas.ModificationOptionUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.ModificationOption).filter(cat_models.ModificationOption.id == option_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Option not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/modification_options/{option_id}")
+def delete_modification_option(option_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.ModificationOption).filter(cat_models.ModificationOption.id == option_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Option not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+# -------- Marketing --------
+@router.get("/banners")
+def list_banners(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.Banner).order_by(cat_models.Banner.sort_order).all()
+
+
+@router.post("/banners")
+def create_banner(payload: admin_schemas.BannerCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.Banner(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/banners/{banner_id}")
+def update_banner(banner_id: int, payload: admin_schemas.BannerUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.Banner).filter(cat_models.Banner.id == banner_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/banners/{banner_id}")
+def delete_banner(banner_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.Banner).filter(cat_models.Banner.id == banner_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/promo_codes")
+def list_promo_codes(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.PromoCode).all()
+
+
+@router.post("/promo_codes")
+def create_promo_code(payload: admin_schemas.PromoCodeCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.PromoCode(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/promo_codes/{promo_id}")
+def update_promo_code(promo_id: int, payload: admin_schemas.PromoCodeUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.PromoCode).filter(cat_models.PromoCode.id == promo_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Promo not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/promo_codes/{promo_id}")
+def delete_promo_code(promo_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.PromoCode).filter(cat_models.PromoCode.id == promo_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Promo not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+# -------- Delivery --------
+@router.get("/pickup_locations")
+def list_pickups(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.PickupLocation).order_by(cat_models.PickupLocation.sort_order).all()
+
+
+@router.post("/pickup_locations")
+def create_pickup(payload: admin_schemas.PickupLocationCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.PickupLocation(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/pickup_locations/{pickup_id}")
+def update_pickup(pickup_id: int, payload: admin_schemas.PickupLocationUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.PickupLocation).filter(cat_models.PickupLocation.id == pickup_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Pickup not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/pickup_locations/{pickup_id}")
+def delete_pickup(pickup_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.PickupLocation).filter(cat_models.PickupLocation.id == pickup_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Pickup not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/delivery_zones")
+def list_delivery_zones(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.DeliveryZone).order_by(cat_models.DeliveryZone.sort_order).all()
+
+
+@router.post("/delivery_zones")
+def create_delivery_zone(payload: admin_schemas.DeliveryZoneCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.DeliveryZone(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/delivery_zones/{zone_id}")
+def update_delivery_zone(zone_id: int, payload: admin_schemas.DeliveryZoneUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.DeliveryZone).filter(cat_models.DeliveryZone.id == zone_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Zone not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/delivery_zones/{zone_id}")
+def delete_delivery_zone(zone_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.DeliveryZone).filter(cat_models.DeliveryZone.id == zone_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Zone not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+# -------- Settings --------
+@router.get("/faqs")
+def list_faqs(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.FAQ).order_by(cat_models.FAQ.sort_order).all()
+
+
+@router.post("/faqs")
+def create_faq(payload: admin_schemas.FAQCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.FAQ(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/faqs/{faq_id}")
+def update_faq(faq_id: int, payload: admin_schemas.FAQUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.FAQ).filter(cat_models.FAQ.id == faq_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="FAQ not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/faqs/{faq_id}")
+def delete_faq(faq_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.FAQ).filter(cat_models.FAQ.id == faq_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="FAQ not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.get("/app_texts")
+def list_app_texts(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.AppText).all()
+
+
+@router.put("/app_texts")
+def update_app_text(payload: admin_schemas.AppTextUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.AppText).filter(cat_models.AppText.key == payload.key).first()
+    if not obj:
+        obj = cat_models.AppText(key=payload.key, value=payload.value)
+        db.add(obj)
+    else:
+        obj.value = payload.value
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.get("/loyalty_settings")
+def get_loyalty_settings(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    # single default from any account or default 5%
+    account = db.query(LoyaltyAccount).first()
+    if account:
+        return {"cashback_percent": account.cashback_percent}
+    return {"cashback_percent": 5.0}
+
+
+@router.put("/loyalty_settings")
+def update_loyalty_settings(payload: admin_schemas.LoyaltySettingsUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    # apply to all accounts; in real life would be config table
+    accounts = db.query(LoyaltyAccount).all()
+    if not accounts:
+        # create default row for propagation
+        accounts = []
+    for acc in accounts:
+        acc.cashback_percent = payload.cashback_percent
+    db.commit()
+    return {"cashback_percent": payload.cashback_percent}
+
+
+# -------- Orders --------
+@router.get("/orders")
+def list_orders(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    user=Depends(get_admin_user),
+):
+    q = db.query(Order)
+    if status_filter:
+        try:
+            st = OrderStatus(status_filter)
+            q = q.filter(Order.status == st)
+        except ValueError:
+            pass
+    return q.order_by(Order.created_at.desc()).limit(limit).all()
+
+
+@router.get("/orders/{order_id}")
+def get_order(order_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
+
+
+@router.post("/orders/{order_id}/status")
+def update_order_status(order_id: int, status_value: str, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    try:
+        order.status = OrderStatus(status_value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+# -------- Users (minimal) --------
+@router.get("/users")
+def list_users(limit: int = 100, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(User).order_by(User.created_at.desc()).limit(limit).all()
+
+
+# -------- Uploads --------
+@router.post("/upload")
+def upload_file(
+    file: UploadFile = File(...),
+    user=Depends(get_admin_user),
+):
+    settings = get_settings()
+    os.makedirs(settings.upload_dir, exist_ok=True)
+    ext = os.path.splitext(file.filename)[1]
+    filename = f"{uuid.uuid4().hex}{ext}"
+    file_path = os.path.join(settings.upload_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(file.file.read())
+    url = f"{str(settings.base_url).rstrip('/')}/uploads/{filename}"
+    return {"url": url, "filename": filename}
+
+
