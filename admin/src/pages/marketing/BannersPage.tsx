@@ -35,13 +35,13 @@ export const BannersPage = () => {
 
   const columns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'Title', dataIndex: 'title' },
-    { title: 'Subtitle', dataIndex: 'subtitle' },
-    { title: 'Image', dataIndex: 'image_url' },
-    { title: 'Sort', dataIndex: 'sort_order' },
-    { title: 'Active', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Yes' : 'No') },
+    { title: 'Заголовок', dataIndex: 'title' },
+    { title: 'Подзаголовок', dataIndex: 'subtitle' },
+    { title: 'Изображение', dataIndex: 'image_url' },
+    { title: 'Сортировка', dataIndex: 'sort_order' },
+    { title: 'Активен', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Да' : 'Нет') },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -53,7 +53,7 @@ export const BannersPage = () => {
                 setFileList([
                   {
                     uid: '1',
-                    name: record.image_url.split('/').pop() || 'image',
+                    name: record.image_url.split('/').pop() || 'изображение',
                     status: 'done',
                     url: record.image_url,
                   },
@@ -64,10 +64,10 @@ export const BannersPage = () => {
               setOpen(true)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button danger size="small" onClick={() => remove.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -78,14 +78,14 @@ export const BannersPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button type="primary" onClick={() => setOpen(true)}>
-          New banner
+          Новый баннер
         </Button>
       </Space>
       <Table loading={isLoading} dataSource={data || []} columns={columns} rowKey="id" />
 
       <Modal
         open={open}
-        title={editing ? 'Edit banner' : 'New banner'}
+        title={editing ? 'Редактировать баннер' : 'Новый баннер'}
         onCancel={() => {
           setOpen(false)
           setEditing(null)
@@ -103,13 +103,13 @@ export const BannersPage = () => {
             save.mutate({ ...values, image_url: imageUrl })
           }}
         >
-          <Form.Item name="title" label="Title" rules={[{ required: true }]}>
+          <Form.Item name="title" label="Заголовок" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="subtitle" label="Subtitle">
+          <Form.Item name="subtitle" label="Подзаголовок">
             <Input />
           </Form.Item>
-          <Form.Item label="Image">
+          <Form.Item label="Изображение">
             <Upload.Dragger
               name="file"
               multiple={false}
@@ -126,7 +126,7 @@ export const BannersPage = () => {
                   onSuccess?.(res.data, file as any)
                   setFileList([{ uid: (file as UploadFile).uid, name: (file as any).name, status: 'done', url }])
                 } catch (err: any) {
-                  message.error(err?.response?.data?.detail || 'Upload failed')
+                  message.error(err?.response?.data?.detail || 'Ошибка загрузки')
                   onError?.(err)
                 }
               }}
@@ -137,13 +137,13 @@ export const BannersPage = () => {
               accept="image/*"
               listType="picture-card"
             >
-              <p className="ant-upload-drag-icon">Click or drag file</p>
+              <p className="ant-upload-drag-icon">Нажмите или перетащите файл</p>
             </Upload.Dragger>
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order">
+          <Form.Item name="sort_order" label="Порядок сортировки">
             <Input type="number" />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активен" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

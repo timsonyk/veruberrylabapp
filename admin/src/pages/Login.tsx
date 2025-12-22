@@ -1,4 +1,4 @@
-import { Card, Form, Input, Button, Typography, message } from 'antd'
+import { Card, Form, Input, Button, message } from 'antd'
 import { useLogin, useSession } from '../hooks/useAuth'
 import { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -19,25 +19,25 @@ export const LoginPage = () => {
   const onFinish = async (values: any) => {
     try {
       await login.mutateAsync(values)
-      message.success('Logged in')
+      message.success('Вы вошли в админку')
       navigate(from, { replace: true })
     } catch (e: any) {
-      message.error(e?.response?.data?.detail || 'Login failed')
+      message.error(e?.response?.data?.detail || 'Ошибка входа')
     }
   }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Card title="Admin Login" style={{ width: 360 }}>
+      <Card title="Вход в админку" style={{ width: 360 }}>
         <Form layout="vertical" onFinish={onFinish}>
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+          <Form.Item name="username" label="Логин" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="password" label="Password" rules={[{ required: true }]}>
+          <Form.Item name="password" label="Пароль" rules={[{ required: true }]}>
             <Input.Password />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={login.isPending}>
-            Login
+            Войти
           </Button>
         </Form>
       </Card>

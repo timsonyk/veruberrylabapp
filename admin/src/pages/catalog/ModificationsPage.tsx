@@ -72,18 +72,18 @@ export const ModificationsPage = () => {
 
   const groupColumns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'Name', dataIndex: 'name' },
-    { title: 'Type', dataIndex: 'type' },
-    { title: 'Min', dataIndex: 'min_count' },
-    { title: 'Max', dataIndex: 'max_count' },
+    { title: 'Название', dataIndex: 'name' },
+    { title: 'Тип', dataIndex: 'type' },
+    { title: 'Мин.', dataIndex: 'min_count' },
+    { title: 'Макс.', dataIndex: 'max_count' },
     {
-      title: 'Products',
+      title: 'Товары',
       dataIndex: 'products',
       render: (list: any[]) => (list || []).map((p) => p.name || p.id).join(', '),
     },
-    { title: 'Active', dataIndex: 'is_active', render: (v: boolean) => (v ? <Tag color="green">Yes</Tag> : <Tag>No</Tag>) },
+    { title: 'Активна', dataIndex: 'is_active', render: (v: boolean) => (v ? <Tag color="green">Да</Tag> : <Tag>Нет</Tag>) },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -97,7 +97,7 @@ export const ModificationsPage = () => {
               setOpenGroup(true)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button
             size="small"
@@ -106,10 +106,10 @@ export const ModificationsPage = () => {
               setOpenOption(true)
             }}
           >
-            Options
+            Опции
           </Button>
           <Button danger size="small" onClick={() => deleteGroup.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -118,11 +118,11 @@ export const ModificationsPage = () => {
 
   const optionColumns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'Name', dataIndex: 'name' },
-    { title: 'Extra', dataIndex: 'extra_price' },
-    { title: 'Default', dataIndex: 'is_default', render: (v: boolean) => (v ? 'Yes' : 'No') },
+    { title: 'Название', dataIndex: 'name' },
+    { title: 'Доплата', dataIndex: 'extra_price' },
+    { title: 'По умолчанию', dataIndex: 'is_default', render: (v: boolean) => (v ? 'Да' : 'Нет') },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -133,10 +133,10 @@ export const ModificationsPage = () => {
               setOpenOption(true)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button danger size="small" onClick={() => deleteOption.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -147,7 +147,7 @@ export const ModificationsPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Select
-          placeholder="Filter by product"
+          placeholder="Фильтр по товару"
           allowClear
           style={{ width: 240 }}
           value={productFilter}
@@ -155,14 +155,14 @@ export const ModificationsPage = () => {
           options={(products || []).map((p: any) => ({ value: p.id, label: p.name }))}
         />
         <Button type="primary" onClick={() => setOpenGroup(true)}>
-          New group
+          Новая группа
         </Button>
       </Space>
       <Table loading={isLoading} dataSource={groups || []} columns={groupColumns} rowKey="id" />
 
       <Modal
         open={openGroup}
-        title={editingGroup ? 'Edit group' : 'New group'}
+        title={editingGroup ? 'Редактировать группу' : 'Новая группа'}
         onCancel={() => {
           setOpenGroup(false)
           setEditingGroup(null)
@@ -176,35 +176,35 @@ export const ModificationsPage = () => {
           initialValues={{ type: 'single', min_count: 0, max_count: 1, is_active: true }}
           onFinish={(values) => saveGroup.mutate({ ...values, type: (values.type || 'single') })}
         >
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="product_ids" label="Products">
+          <Form.Item name="product_ids" label="Товары">
             <Select
               mode="multiple"
               allowClear
               options={(products || []).map((p: any) => ({ value: p.id, label: p.name }))}
-              placeholder="Select products"
+              placeholder="Выберите товары"
             />
           </Form.Item>
-          <Form.Item name="type" label="Type">
+          <Form.Item name="type" label="Тип">
             <Select
               options={[
-                { value: 'single', label: 'Single (radio)' },
-                { value: 'multiple', label: 'Multiple (checkbox)' },
+                { value: 'single', label: 'Один (радио)' },
+                { value: 'multiple', label: 'Несколько (чекбоксы)' },
               ]}
             />
           </Form.Item>
-          <Form.Item name="min_count" label="Min count">
+          <Form.Item name="min_count" label="Мин. количество">
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="max_count" label="Max count">
+          <Form.Item name="max_count" label="Макс. количество">
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order">
+          <Form.Item name="sort_order" label="Порядок сортировки">
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активна" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -212,7 +212,7 @@ export const ModificationsPage = () => {
 
       <Modal
         open={openOption}
-        title={editingOption ? 'Edit option' : 'New option'}
+        title={editingOption ? 'Редактировать опцию' : 'Новая опция'}
         onCancel={() => {
           setOpenOption(false)
           setEditingOption(null)
@@ -229,19 +229,19 @@ export const ModificationsPage = () => {
           <Form.Item name="id" hidden>
             <Input />
           </Form.Item>
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="extra_price" label="Extra price" rules={[{ required: true }]}>
+          <Form.Item name="extra_price" label="Доплата" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order">
+          <Form.Item name="sort_order" label="Порядок сортировки">
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="is_default" label="Default" valuePropName="checked">
+          <Form.Item name="is_default" label="По умолчанию" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активна" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

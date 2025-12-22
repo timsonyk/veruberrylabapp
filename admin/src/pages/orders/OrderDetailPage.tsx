@@ -4,6 +4,14 @@ import { useParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 
 const fetchOrder = async (id: string) => (await api.get(`/admin/orders/${id}`)).data
+const statusLabels: Record<string, string> = {
+  new: 'Новый',
+  pending_payment: 'Ожидает оплаты',
+  paid: 'Оплачен',
+  in_progress: 'В работе',
+  delivered: 'Доставлен',
+  cancelled: 'Отменён',
+}
 
 export const OrderDetailPage = () => {
   const { id } = useParams()
@@ -13,28 +21,28 @@ export const OrderDetailPage = () => {
 
   return (
     <div>
-      <Descriptions title={`Order #${data.id}`} bordered column={1}>
-        <Descriptions.Item label="User">{data.user_id}</Descriptions.Item>
-        <Descriptions.Item label="Status">
-          <Tag>{data.status}</Tag>
+      <Descriptions title={`Заказ #${data.id}`} bordered column={1}>
+        <Descriptions.Item label="Пользователь">{data.user_id}</Descriptions.Item>
+        <Descriptions.Item label="Статус">
+          <Tag>{statusLabels[data.status] || data.status}</Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Delivery type">{data.delivery_type}</Descriptions.Item>
-        <Descriptions.Item label="Address">{data.address_text}</Descriptions.Item>
-        <Descriptions.Item label="City">{data.city}</Descriptions.Item>
-        <Descriptions.Item label="Total">{data.total} ₽</Descriptions.Item>
-        <Descriptions.Item label="Delivery fee">{data.delivery_fee} ₽</Descriptions.Item>
-        <Descriptions.Item label="Discount">{data.discount} ₽</Descriptions.Item>
-        <Descriptions.Item label="Comment">{data.comment}</Descriptions.Item>
-        <Descriptions.Item label="No call">{data.no_call ? 'Yes' : 'No'}</Descriptions.Item>
+        <Descriptions.Item label="Тип доставки">{data.delivery_type}</Descriptions.Item>
+        <Descriptions.Item label="Адрес">{data.address_text}</Descriptions.Item>
+        <Descriptions.Item label="Город">{data.city}</Descriptions.Item>
+        <Descriptions.Item label="Сумма">{data.total} ₽</Descriptions.Item>
+        <Descriptions.Item label="Стоимость доставки">{data.delivery_fee} ₽</Descriptions.Item>
+        <Descriptions.Item label="Скидка">{data.discount} ₽</Descriptions.Item>
+        <Descriptions.Item label="Комментарий">{data.comment}</Descriptions.Item>
+        <Descriptions.Item label="Не звонить">{data.no_call ? 'Да' : 'Нет'}</Descriptions.Item>
       </Descriptions>
 
       <Divider />
       <List
-        header="Items"
+        header="Позиции"
         dataSource={data.items || []}
         renderItem={(item: any) => (
           <List.Item>
-            #{item.product_id} size:{item.size_id ?? '-'} qty:{item.quantity} price:{item.final_price} ₽
+            #{item.product_id} размер:{item.size_id ?? '-'} кол-во:{item.quantity} цена:{item.final_price} ₽
           </List.Item>
         )}
       />

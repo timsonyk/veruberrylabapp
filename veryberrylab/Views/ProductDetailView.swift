@@ -10,13 +10,35 @@ struct ProductDetailView: View {
             if let product = vm.product {
                 VStack(alignment: .leading, spacing: 16) {
                     if let urlString = product.media?.first, let url = URL(string: urlString) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            Color.gray.opacity(0.2)
+                        GeometryReader { geometry in
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .empty:
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.1))
+                                        .overlay(ProgressView())
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: geometry.size.width, height: geometry.size.width)
+                                        .clipped()
+                                case .failure:
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.1))
+                                        .overlay(
+                                            Image(systemName: "photo")
+                                                .font(.largeTitle)
+                                                .foregroundColor(.gray)
+                                        )
+                                @unknown default:
+                                    Color.gray.opacity(0.1)
+                                }
+                            }
+                            .frame(width: geometry.size.width, height: geometry.size.width)
                         }
-                        .frame(height: 240)
-                        .clipped()
+                        .aspectRatio(1, contentMode: .fit)
+                        .cornerRadius(14)
                     }
                     if let name = product.name {
                         Text(name).font(.title2).bold()

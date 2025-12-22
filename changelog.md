@@ -1,0 +1,6 @@
+- SwiftUI iOS app: auth via code, catalog with banners/categories/products, product detail, cart UI and tab navigation tied to API client.
+- Admin SPA scaffolded (Vite + React + TS) with protected layout and routes for catalog, orders, marketing, delivery, and settings; axios client configured.
+- Backend MVP: FastAPI + Postgres + JWT with auth, catalog, promo, pricing/orders APIs, alembic migrations, docker-compose, and static uploads.
+- Init backend scaffold
+- Admin panel added
+- iOS client connected to API

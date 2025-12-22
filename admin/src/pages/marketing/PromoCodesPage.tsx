@@ -37,12 +37,12 @@ export const PromoCodesPage = () => {
   })
 
   const columns = [
-    { title: 'Code', dataIndex: 'code' },
-    { title: 'Type', dataIndex: 'discount_type' },
-    { title: 'Value', dataIndex: 'discount_value' },
-    { title: 'Active', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Yes' : 'No') },
+    { title: 'Код', dataIndex: 'code' },
+    { title: 'Тип', dataIndex: 'discount_type' },
+    { title: 'Значение', dataIndex: 'discount_value' },
+    { title: 'Активен', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Да' : 'Нет') },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -57,10 +57,10 @@ export const PromoCodesPage = () => {
               setOpen(true)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button danger size="small" onClick={() => remove.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -71,14 +71,14 @@ export const PromoCodesPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button type="primary" onClick={() => setOpen(true)}>
-          New promo
+          Новый промокод
         </Button>
       </Space>
       <Table loading={isLoading} dataSource={data || []} columns={columns} rowKey="id" />
 
       <Modal
         open={open}
-        title={editing ? 'Edit promo' : 'New promo'}
+        title={editing ? 'Редактировать промокод' : 'Новый промокод'}
         onCancel={() => {
           setOpen(false)
           setEditing(null)
@@ -92,33 +92,33 @@ export const PromoCodesPage = () => {
           initialValues={{ is_active: true, discount_type: 'percent' }}
           onFinish={(values) => save.mutate(values)}
         >
-          <Form.Item name="code" label="Code" rules={[{ required: true }]}>
+          <Form.Item name="code" label="Код" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="discount_type" label="Type" rules={[{ required: true }]}>
+          <Form.Item name="discount_type" label="Тип" rules={[{ required: true }]}>
             <Select
               options={[
-                { value: 'percent', label: 'Percent' },
-                { value: 'fixed', label: 'Fixed' },
+                { value: 'percent', label: 'Процент' },
+                { value: 'fixed', label: 'Фиксированная сумма' },
               ]}
             />
           </Form.Item>
-          <Form.Item name="discount_value" label="Value" rules={[{ required: true }]}>
+          <Form.Item name="discount_value" label="Значение" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="min_order_total" label="Min order total">
+          <Form.Item name="min_order_total" label="Мин. сумма заказа">
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="usage_limit" label="Usage limit">
+          <Form.Item name="usage_limit" label="Лимит использований">
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="starts_at" label="Starts at">
+          <Form.Item name="starts_at" label="Начало">
             <DatePicker style={{ width: '100%' }} showTime />
           </Form.Item>
-          <Form.Item name="ends_at" label="Ends at">
+          <Form.Item name="ends_at" label="Окончание">
             <DatePicker style={{ width: '100%' }} showTime />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активен" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

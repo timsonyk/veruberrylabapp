@@ -37,11 +37,11 @@ export const CategoriesPage = () => {
 
   const columns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'Name', dataIndex: 'name' },
-    { title: 'Sort', dataIndex: 'sort_order' },
-    { title: 'Active', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Yes' : 'No') },
+    { title: 'Название', dataIndex: 'name' },
+    { title: 'Сортировка', dataIndex: 'sort_order' },
+    { title: 'Активна', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Да' : 'Нет') },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -52,10 +52,10 @@ export const CategoriesPage = () => {
               setOpen(true)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button danger size="small" onClick={() => remove.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -72,14 +72,14 @@ export const CategoriesPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button type="primary" onClick={openCreate}>
-          New category
+          Новая категория
         </Button>
       </Space>
       <Table loading={isLoading} dataSource={data || []} columns={columns} rowKey="id" />
 
       <Modal
         open={open}
-        title={editing ? 'Edit category' : 'New category'}
+        title={editing ? 'Редактировать категорию' : 'Новая категория'}
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}
         confirmLoading={save.isPending}
@@ -90,13 +90,13 @@ export const CategoriesPage = () => {
           initialValues={{ is_active: true }}
           onFinish={(values) => save.mutate(values)}
         >
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order" initialValue={0}>
+          <Form.Item name="sort_order" label="Порядок сортировки" initialValue={0}>
             <Input type="number" />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активна" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

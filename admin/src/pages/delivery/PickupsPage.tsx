@@ -32,13 +32,13 @@ export const PickupsPage = () => {
 
   const columns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'City', dataIndex: 'city' },
-    { title: 'Address', dataIndex: 'address' },
-    { title: 'Schedule', dataIndex: 'schedule_text' },
-    { title: 'Sort', dataIndex: 'sort_order' },
-    { title: 'Active', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Yes' : 'No') },
+    { title: 'Город', dataIndex: 'city' },
+    { title: 'Адрес', dataIndex: 'address' },
+    { title: 'График', dataIndex: 'schedule_text' },
+    { title: 'Сортировка', dataIndex: 'sort_order' },
+    { title: 'Активна', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Да' : 'Нет') },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -49,10 +49,10 @@ export const PickupsPage = () => {
               setOpen(true)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button danger size="small" onClick={() => remove.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -63,14 +63,14 @@ export const PickupsPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button type="primary" onClick={() => setOpen(true)}>
-          New pickup
+          Новая точка самовывоза
         </Button>
       </Space>
       <Table loading={isLoading} dataSource={data || []} columns={columns} rowKey="id" />
 
       <Modal
         open={open}
-        title={editing ? 'Edit pickup' : 'New pickup'}
+        title={editing ? 'Редактировать точку самовывоза' : 'Новая точка самовывоза'}
         onCancel={() => {
           setOpen(false)
           setEditing(null)
@@ -84,19 +84,19 @@ export const PickupsPage = () => {
           initialValues={{ is_active: true, sort_order: 0 }}
           onFinish={(values) => save.mutate(values)}
         >
-          <Form.Item name="city" label="City" rules={[{ required: true }]}>
+          <Form.Item name="city" label="Город" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="address" label="Address" rules={[{ required: true }]}>
+          <Form.Item name="address" label="Адрес" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="schedule_text" label="Schedule">
+          <Form.Item name="schedule_text" label="График">
             <Input />
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order">
+          <Form.Item name="sort_order" label="Порядок сортировки">
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активна" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

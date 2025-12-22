@@ -1,9 +1,10 @@
 from typing import Optional
 import os
 import uuid
+from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Query, UploadFile, File
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.admin_deps import clear_admin_cookie, get_admin_user, set_admin_cookie
 from app.api.deps import get_db
@@ -101,6 +102,49 @@ def update_product(product_id: int, payload: admin_schemas.ProductUpdate, db: Se
     db.commit()
     db.refresh(obj)
     return obj
+
+
+@router.post("/products/bulk_price")
+def bulk_update_product_prices(
+    payload: admin_schemas.BulkPriceUpdateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_admin_user),
+):
+    if payload.percent == 0:
+        return {"updated_products": 0, "updated_sizes": 0}
+    if payload.percent <= -100:
+        raise HTTPException(status_code=400, detail="percent must be greater than -100")
+    if (not payload.apply_to_all) and (not payload.product_ids):
+        raise HTTPException(status_code=400, detail="product_ids is required unless apply_to_all=true")
+
+    multiplier = Decimal("1") + (Decimal(str(payload.percent)) / Decimal("100"))
+    if multiplier <= 0:
+        raise HTTPException(status_code=400, detail="Invalid percent value")
+
+    def q2(amount: Decimal) -> Decimal:
+        return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    q = db.query(cat_models.Product)
+    if payload.apply_to_sizes:
+        q = q.options(joinedload(cat_models.Product.sizes))
+    if not payload.apply_to_all:
+        q = q.filter(cat_models.Product.id.in_(payload.product_ids))
+
+    products = q.all()
+    if not products:
+        raise HTTPException(status_code=404, detail="No products found for update")
+
+    updated_sizes = 0
+    for p in products:
+        # SQLAlchemy Numeric -> Decimal; keep as Decimal with 2 digits
+        p.base_price = q2(Decimal(p.base_price) * multiplier)
+        if payload.apply_to_sizes:
+            for s in p.sizes:
+                s.base_price = q2(Decimal(s.base_price) * multiplier)
+                updated_sizes += 1
+
+    db.commit()
+    return {"updated_products": len(products), "updated_sizes": updated_sizes, "multiplier": float(multiplier)}
 
 
 @router.delete("/products/{product_id}")

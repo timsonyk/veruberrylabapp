@@ -2,60 +2,58 @@ import { Layout, Menu, Typography } from 'antd'
 import {
   AppstoreOutlined,
   ShopOutlined,
-  ProfileOutlined,
   GiftOutlined,
   ShoppingCartOutlined,
   SettingOutlined,
   DeploymentUnitOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useLogout, useSession } from '../hooks/useAuth'
-import { useEffect } from 'react'
+import { useLogout } from '../hooks/useAuth'
 
 const { Header, Sider, Content } = Layout
 
 const menuItems = [
-  { key: '/', icon: <AppstoreOutlined />, label: <Link to="/">Dashboard</Link> },
+  { key: '/', icon: <AppstoreOutlined />, label: <Link to="/">Главная</Link> },
   {
     key: '/catalog',
     icon: <ShopOutlined />,
-    label: 'Catalog',
+    label: 'Каталог',
     children: [
-      { key: '/catalog/categories', label: <Link to="/catalog/categories">Categories</Link> },
-      { key: '/catalog/products', label: <Link to="/catalog/products">Products</Link> },
-      { key: '/catalog/modifications', label: <Link to="/catalog/modifications">Modifications</Link> },
+      { key: '/catalog/categories', label: <Link to="/catalog/categories">Категории</Link> },
+      { key: '/catalog/products', label: <Link to="/catalog/products">Товары</Link> },
+      { key: '/catalog/modifications', label: <Link to="/catalog/modifications">Модификации</Link> },
     ],
   },
   {
     key: '/orders',
     icon: <ShoppingCartOutlined />,
-    label: <Link to="/orders">Orders</Link>,
+    label: <Link to="/orders">Заказы</Link>,
   },
   {
     key: '/marketing',
     icon: <GiftOutlined />,
-    label: 'Marketing',
+    label: 'Маркетинг',
     children: [
-      { key: '/marketing/banners', label: <Link to="/marketing/banners">Banners</Link> },
-      { key: '/marketing/promo-codes', label: <Link to="/marketing/promo-codes">Promo codes</Link> },
+      { key: '/marketing/banners', label: <Link to="/marketing/banners">Баннеры</Link> },
+      { key: '/marketing/promo-codes', label: <Link to="/marketing/promo-codes">Промокоды</Link> },
     ],
   },
   {
     key: '/delivery',
     icon: <DeploymentUnitOutlined />,
-    label: 'Delivery',
+    label: 'Доставка',
     children: [
-      { key: '/delivery/pickups', label: <Link to="/delivery/pickups">Pickups</Link> },
-      { key: '/delivery/zones', label: <Link to="/delivery/zones">Zones</Link> },
+      { key: '/delivery/pickups', label: <Link to="/delivery/pickups">Самовывоз</Link> },
+      { key: '/delivery/zones', label: <Link to="/delivery/zones">Зоны</Link> },
     ],
   },
   {
     key: '/settings',
     icon: <SettingOutlined />,
-    label: 'Settings',
+    label: 'Настройки',
     children: [
-      { key: '/settings/texts', label: <Link to="/settings/texts">Texts</Link> },
-      { key: '/settings/loyalty', label: <Link to="/settings/loyalty">Loyalty</Link> },
+      { key: '/settings/texts', label: <Link to="/settings/texts">Тексты</Link> },
+      { key: '/settings/loyalty', label: <Link to="/settings/loyalty">Лояльность</Link> },
     ],
   },
 ]
@@ -63,17 +61,12 @@ const menuItems = [
 export const AdminLayout = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { data } = useSession()
   const logout = useLogout()
 
   const onLogout = async () => {
     await logout.mutateAsync()
     navigate('/login')
   }
-
-  useEffect(() => {
-    if (!data?.authenticated) return
-  }, [data])
 
   const selectedKeys = [location.pathname.startsWith('/catalog') ? '/catalog' : location.pathname]
 
@@ -97,8 +90,8 @@ export const AdminLayout = () => {
             justifyContent: 'space-between',
           }}
         >
-          <Typography.Text>Admin</Typography.Text>
-          <Typography.Link onClick={onLogout}>Logout</Typography.Link>
+          <Typography.Text>Админка</Typography.Text>
+          <Typography.Link onClick={onLogout}>Выйти</Typography.Link>
         </Header>
         <Content style={{ padding: 16 }}>
           <Outlet />

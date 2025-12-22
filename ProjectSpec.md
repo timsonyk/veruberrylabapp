@@ -1,8 +1,3 @@
-Вот Project Spec для VeryBerryLab в формате Markdown, с убранным 5-м пунктом (про UX-шаги оставляем, а вот отдельного пункта про «что делает пользователь по шагам» как самостоятельного — нет; он встроен кратко в product requirements).
-
-⸻
-
-
 # VeryBerryLab — Project Spec
 
 ## 1. Product Requirements
@@ -148,11 +143,3 @@ FastAPI:
 6. Деплой на VPS
 
 
-⸻
-
-Если хочешь, следующим шагом могу:
-	•	упростить этот файл в 2 раза
-	•	адаптировать его под Cursor / Claude Code
-	•	сделать milestones.md
-	•	сделать claude.md (память проекта для ИИ)
-	•	разложить всё в PSB (Plan / Setup / Build) под твой проект

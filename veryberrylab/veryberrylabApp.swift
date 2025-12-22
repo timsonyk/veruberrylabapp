@@ -14,7 +14,7 @@ struct veryberrylabApp: App {
     @StateObject var catalogVM = CatalogViewModel()
     var body: some Scene {
         WindowGroup {
-            MainTabView()
+            SplashView()
                 .environmentObject(appState)
                 .environmentObject(cartVM)
                 .environmentObject(catalogVM)

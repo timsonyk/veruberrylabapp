@@ -13,7 +13,7 @@ export const LoyaltyPage = () => {
     mutationFn: async (values: any) => api.put('/admin/loyalty_settings', values),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loyalty_settings'] })
-      message.success('Updated')
+      message.success('Сохранено')
     },
   })
 
@@ -25,14 +25,14 @@ export const LoyaltyPage = () => {
       onFinish={(values) => save.mutate(values)}
     >
       <Form.Item
-        label="Cashback percent"
+        label="Процент кэшбэка"
         name="cashback_percent"
-        rules={[{ required: true, message: 'Required' }]}
+        rules={[{ required: true, message: 'Обязательно' }]}
       >
         <InputNumber min={0} max={50} style={{ width: 200 }} />
       </Form.Item>
       <Button type="primary" htmlType="submit" loading={save.isPending} disabled={isLoading}>
-        Save
+        Сохранить
       </Button>
     </Form>
   )

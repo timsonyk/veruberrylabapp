@@ -32,16 +32,16 @@ export const ZonesPage = () => {
 
   const columns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'City', dataIndex: 'city' },
-    { title: 'Lat', dataIndex: 'center_lat' },
-    { title: 'Lng', dataIndex: 'center_lng' },
-    { title: 'Radius m', dataIndex: 'radius_meters' },
-    { title: 'Fee', dataIndex: 'delivery_fee' },
-    { title: 'SLA', dataIndex: 'sla_minutes' },
-    { title: 'Sort', dataIndex: 'sort_order' },
-    { title: 'Active', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Yes' : 'No') },
+    { title: 'Город', dataIndex: 'city' },
+    { title: 'Широта', dataIndex: 'center_lat' },
+    { title: 'Долгота', dataIndex: 'center_lng' },
+    { title: 'Радиус, м', dataIndex: 'radius_meters' },
+    { title: 'Стоимость', dataIndex: 'delivery_fee' },
+    { title: 'SLA (мин)', dataIndex: 'sla_minutes' },
+    { title: 'Сортировка', dataIndex: 'sort_order' },
+    { title: 'Активна', dataIndex: 'is_active', render: (v: boolean) => (v ? 'Да' : 'Нет') },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -52,10 +52,10 @@ export const ZonesPage = () => {
               setOpen(true)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button danger size="small" onClick={() => remove.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -66,14 +66,14 @@ export const ZonesPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button type="primary" onClick={() => setOpen(true)}>
-          New zone
+          Новая зона
         </Button>
       </Space>
       <Table loading={isLoading} dataSource={data || []} columns={columns} rowKey="id" />
 
       <Modal
         open={open}
-        title={editing ? 'Edit zone' : 'New zone'}
+        title={editing ? 'Редактировать зону' : 'Новая зона'}
         onCancel={() => {
           setOpen(false)
           setEditing(null)
@@ -87,31 +87,31 @@ export const ZonesPage = () => {
           initialValues={{ is_active: true, sort_order: 0, sla_minutes: 180 }}
           onFinish={(values) => save.mutate(values)}
         >
-          <Form.Item name="city" label="City" rules={[{ required: true }]}>
+          <Form.Item name="city" label="Город" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="center_lat" label="Latitude" rules={[{ required: true }]}>
+          <Form.Item name="center_lat" label="Широта" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="center_lng" label="Longitude" rules={[{ required: true }]}>
+          <Form.Item name="center_lng" label="Долгота" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="radius_meters" label="Radius (m)" rules={[{ required: true }]}>
+          <Form.Item name="radius_meters" label="Радиус (м)" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="delivery_fee" label="Delivery fee" rules={[{ required: true }]}>
+          <Form.Item name="delivery_fee" label="Стоимость доставки" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="sla_minutes" label="SLA minutes">
+          <Form.Item name="sla_minutes" label="SLA (мин)">
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="min_order_total" label="Min order total">
+          <Form.Item name="min_order_total" label="Мин. сумма заказа">
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order">
+          <Form.Item name="sort_order" label="Порядок сортировки">
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активна" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

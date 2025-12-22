@@ -6,11 +6,13 @@ import {
   Input,
   InputNumber,
   Modal,
+  Radio,
   Select,
   Space,
   Switch,
   Table,
   Tag,
+  Typography,
   Upload,
   message,
 } from 'antd'
@@ -31,6 +33,13 @@ export const ProductsPage = () => {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [fileList, setFileList] = useState<UploadFile[]>([])
+
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkPercent, setBulkPercent] = useState<number>(0)
+  const [bulkDirection, setBulkDirection] = useState<'up' | 'down'>('up')
+  const [bulkApplyToAll, setBulkApplyToAll] = useState(false)
+  const [bulkApplyToSizes, setBulkApplyToSizes] = useState(false)
 
   const [sizesOpen, setSizesOpen] = useState(false)
   const [currentProductId, setCurrentProductId] = useState<number | null>(null)
@@ -78,20 +87,51 @@ export const ProductsPage = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
   })
 
+  const bulkUpdatePrices = useMutation({
+    mutationFn: async (payload: {
+      product_ids?: number[]
+      apply_to_all: boolean
+      percent: number
+      apply_to_sizes: boolean
+    }) => api.post('/admin/products/bulk_price', payload),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      if (bulkApplyToSizes && currentProductId) {
+        qc.invalidateQueries({ queryKey: ['product_sizes', currentProductId] })
+      }
+      const updatedProducts = res?.data?.updated_products ?? 0
+      const updatedSizes = res?.data?.updated_sizes ?? 0
+      message.success(
+        bulkApplyToSizes
+          ? `Обновлено: товаров — ${updatedProducts}, размеров — ${updatedSizes}`
+          : `Обновлено товаров: ${updatedProducts}`,
+      )
+      setBulkOpen(false)
+      setSelectedRowKeys([])
+      setBulkPercent(0)
+      setBulkDirection('up')
+      setBulkApplyToAll(false)
+      setBulkApplyToSizes(false)
+    },
+    onError: (err: any) => {
+      message.error(err?.response?.data?.detail || 'Не удалось массово изменить цены')
+    },
+  })
+
   const columns = useMemo(
     () => [
       { title: 'ID', dataIndex: 'id' },
-      { title: 'Name', dataIndex: 'name' },
+      { title: 'Название', dataIndex: 'name' },
       {
-        title: 'Category',
+        title: 'Категория',
         dataIndex: 'category_id',
         render: (id: number) => categories?.find((c: any) => c.id === id)?.name || id,
       },
-      { title: 'Base price', dataIndex: 'base_price' },
-      { title: 'Sizes', render: (_: any, record: any) => (record.size_label ? record.size_label : 'sizes table') },
-      { title: 'Active', dataIndex: 'is_active', render: (v: boolean) => (v ? <Tag color="green">Yes</Tag> : <Tag>No</Tag>) },
+      { title: 'Базовая цена', dataIndex: 'base_price' },
+      { title: 'Размеры', render: (_: any, record: any) => (record.size_label ? record.size_label : 'таблица размеров') },
+      { title: 'Активен', dataIndex: 'is_active', render: (v: boolean) => (v ? <Tag color="green">Да</Tag> : <Tag>Нет</Tag>) },
       {
-        title: 'Actions',
+        title: 'Действия',
         render: (_: any, record: any) => (
           <Space>
             <Button
@@ -104,7 +144,7 @@ export const ProductsPage = () => {
                   setFileList(
                     record.media.map((url: string, idx: number) => ({
                       uid: `${idx}`,
-                      name: url.split('/').pop() || `image-${idx}`,
+                      name: url.split('/').pop() || `изображение-${idx}`,
                       status: 'done',
                       url,
                     })),
@@ -115,7 +155,7 @@ export const ProductsPage = () => {
                 setOpen(true)
               }}
             >
-              Edit
+              Редактировать
             </Button>
             <Button
               size="small"
@@ -124,10 +164,10 @@ export const ProductsPage = () => {
                 setSizesOpen(true)
               }}
             >
-              Sizes
+              Размеры
             </Button>
             <Button danger size="small" onClick={() => deleteProduct.mutate(record.id)}>
-              Delete
+              Удалить
             </Button>
           </Space>
         ),
@@ -146,11 +186,11 @@ export const ProductsPage = () => {
 
   const sizeColumns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'Name', dataIndex: 'name' },
-    { title: 'Price', dataIndex: 'base_price' },
-    { title: 'Sort', dataIndex: 'sort_order' },
+    { title: 'Название', dataIndex: 'name' },
+    { title: 'Цена', dataIndex: 'base_price' },
+    { title: 'Сортировка', dataIndex: 'sort_order' },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
           <Button
@@ -159,10 +199,10 @@ export const ProductsPage = () => {
               sizeForm.setFieldsValue(record)
             }}
           >
-            Edit
+            Редактировать
           </Button>
           <Button danger size="small" onClick={() => deleteSize.mutate(record.id)}>
-            Delete
+            Удалить
           </Button>
         </Space>
       ),
@@ -180,14 +220,96 @@ export const ProductsPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Button type="primary" onClick={openCreate}>
-          New product
+          Новый товар
         </Button>
+        <Button onClick={() => setBulkOpen(true)}>Массовое изменение цен</Button>
+        <Button onClick={() => setSelectedRowKeys([])} disabled={selectedRowKeys.length === 0}>
+          Снять выделение
+        </Button>
+        <Typography.Text type="secondary">Выбрано: {selectedRowKeys.length}</Typography.Text>
       </Space>
-      <Table loading={isLoading} dataSource={products || []} columns={columns as any} rowKey="id" />
+      <Table
+        loading={isLoading}
+        dataSource={products || []}
+        columns={columns as any}
+        rowKey="id"
+        rowSelection={{
+          selectedRowKeys,
+          preserveSelectedRowKeys: true,
+          onChange: (keys) => setSelectedRowKeys(keys as number[]),
+        }}
+      />
+
+      <Modal
+        open={bulkOpen}
+        title="Массовое изменение цен"
+        onCancel={() => setBulkOpen(false)}
+        okText="Применить"
+        confirmLoading={bulkUpdatePrices.isPending}
+        onOk={() => {
+          if (!bulkApplyToAll && selectedRowKeys.length === 0) {
+            message.error('Выберите товары или включите «Применить ко всем товарам»')
+            return
+          }
+          if (!bulkPercent || bulkPercent <= 0) {
+            message.error('Введите процент > 0')
+            return
+          }
+          const signedPercent = bulkDirection === 'down' ? -Math.abs(bulkPercent) : Math.abs(bulkPercent)
+          Modal.confirm({
+            title: 'Подтвердите изменение цен',
+            content: bulkApplyToAll
+              ? `Применить ${signedPercent}% ко ВСЕМ товарам${bulkApplyToSizes ? ' (включая размеры)' : ''}?`
+              : `Применить ${signedPercent}% к выбранным товарам (${selectedRowKeys.length} шт.)${bulkApplyToSizes ? ' (включая размеры)' : ''}?`,
+            okText: 'Да, применить',
+            cancelText: 'Отмена',
+            onOk: () =>
+              bulkUpdatePrices.mutate({
+                product_ids: bulkApplyToAll ? undefined : selectedRowKeys,
+                apply_to_all: bulkApplyToAll,
+                percent: signedPercent,
+                apply_to_sizes: bulkApplyToSizes,
+              }),
+          })
+        }}
+        destroyOnHidden
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+            <Typography.Text>Применить ко всем товарам</Typography.Text>
+            <Switch checked={bulkApplyToAll} onChange={setBulkApplyToAll} />
+          </Space>
+
+          {!bulkApplyToAll && (
+            <Typography.Text type="secondary">
+              Будет применено к выбранным товарам: {selectedRowKeys.length}
+            </Typography.Text>
+          )}
+
+          <Space wrap>
+            <Radio.Group value={bulkDirection} onChange={(e) => setBulkDirection(e.target.value)}>
+              <Radio.Button value="up">Повысить</Radio.Button>
+              <Radio.Button value="down">Понизить</Radio.Button>
+            </Radio.Group>
+            <InputNumber
+              min={0}
+              max={1000}
+              value={bulkPercent}
+              onChange={(v) => setBulkPercent(typeof v === 'number' ? v : 0)}
+            />
+            <Typography.Text>%</Typography.Text>
+          </Space>
+
+          <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+            <Typography.Text>Также изменить цены размеров</Typography.Text>
+            <Switch checked={bulkApplyToSizes} onChange={setBulkApplyToSizes} />
+          </Space>
+        </Space>
+      </Modal>
 
       <Modal
         open={open}
-        title={editing ? 'Edit product' : 'New product'}
+        title={editing ? 'Редактировать товар' : 'Новый товар'}
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}
         confirmLoading={saveProduct.isPending}
@@ -204,22 +326,22 @@ export const ProductsPage = () => {
             saveProduct.mutate({ ...values, media: mediaUrls })
           }}
         >
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="category_id" label="Category" rules={[{ required: true }]}>
+          <Form.Item name="category_id" label="Категория" rules={[{ required: true }]}>
             <Select options={(categories || []).map((c: any) => ({ value: c.id, label: c.name }))} />
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label="Описание">
             <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item name="base_price" label="Base price" rules={[{ required: true }]}>
+          <Form.Item name="base_price" label="Базовая цена" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="size_label" label="Size label (fallback)">
+          <Form.Item name="size_label" label="Подпись размера (если нет размеров)">
             <Input placeholder="S / M / L / XL" />
           </Form.Item>
-          <Form.Item label="Images">
+          <Form.Item label="Изображения">
             <Upload.Dragger
               name="file"
               multiple
@@ -238,7 +360,7 @@ export const ProductsPage = () => {
                     prev.map((f) => (f.uid === (file as UploadFile).uid ? { ...f, url, status: 'done' } : f)),
                   )
                 } catch (err: any) {
-                  message.error(err?.response?.data?.detail || 'Upload failed')
+                  message.error(err?.response?.data?.detail || 'Ошибка загрузки')
                   onError?.(err)
                 }
               }}
@@ -249,20 +371,20 @@ export const ProductsPage = () => {
               accept="image/*"
               listType="picture-card"
             >
-              <p className="ant-upload-drag-icon">Click or drag files</p>
+              <p className="ant-upload-drag-icon">Нажмите или перетащите файлы</p>
             </Upload.Dragger>
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order" initialValue={0}>
+          <Form.Item name="sort_order" label="Порядок сортировки" initialValue={0}>
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="is_active" label="Active" valuePropName="checked">
+          <Form.Item name="is_active" label="Активен" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
       </Modal>
 
       <Drawer
-        title="Product sizes"
+        title="Размеры товара"
         open={sizesOpen}
         onClose={() => setSizesOpen(false)}
         size="large"
@@ -272,20 +394,20 @@ export const ProductsPage = () => {
           <Form.Item name="id" hidden>
             <Input />
           </Form.Item>
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="base_price" label="Price" rules={[{ required: true }]}>
+          <Form.Item name="base_price" label="Цена" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={0} />
           </Form.Item>
-          <Form.Item name="sort_order" label="Sort order" initialValue={0}>
+          <Form.Item name="sort_order" label="Порядок сортировки" initialValue={0}>
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={saveSize.isPending}>
-              Save
+              Сохранить
             </Button>
-            <Button onClick={() => sizeForm.resetFields()}>Clear</Button>
+            <Button onClick={() => sizeForm.resetFields()}>Очистить</Button>
           </Space>
         </Form>
 

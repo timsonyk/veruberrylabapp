@@ -15,22 +15,22 @@ export const TextsPage = () => {
   })
 
   const columns = [
-    { title: 'Key', dataIndex: 'key' },
-    { title: 'Value', dataIndex: 'value' },
+    { title: 'Ключ', dataIndex: 'key' },
+    { title: 'Значение', dataIndex: 'value' },
   ]
 
   return (
     <Space direction="vertical" style={{ width: '100%' }}>
       <Form layout="inline" form={form} onFinish={(values) => save.mutate(values)}>
-        <Form.Item name="key" rules={[{ required: true }]} label="Key">
+        <Form.Item name="key" rules={[{ required: true }]} label="Ключ">
           <Input placeholder="about_app" />
         </Form.Item>
-        <Form.Item name="value" rules={[{ required: true }]} label="Value">
+        <Form.Item name="value" rules={[{ required: true }]} label="Значение">
           <Input style={{ width: 400 }} />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit" loading={save.isPending}>
-            Save
+            Сохранить
           </Button>
         </Form.Item>
       </Form>

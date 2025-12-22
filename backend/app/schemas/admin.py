@@ -43,6 +43,19 @@ class ProductUpdate(BaseModel):
     media: Optional[list] = None
 
 
+class BulkPriceUpdateRequest(BaseModel):
+    """
+    Массовое изменение цен.
+
+    percent: signed percent (e.g. +10.0 or -15.0)
+    """
+
+    product_ids: Optional[List[int]] = None
+    apply_to_all: bool = False
+    percent: float
+    apply_to_sizes: bool = False
+
+
 class ProductSizeCreate(BaseModel):
     product_id: int
     name: str

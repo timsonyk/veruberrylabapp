@@ -118,65 +118,44 @@ private struct ProductCard: View {
     var onAdd: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.08))
-                if let urlString = product.media?.first, let url = URL(string: urlString) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                        case .success(let image):
-                            image.resizable().scaledToFill()
-                        case .failure(let error):
-                            VStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(.red)
-                                Text("Error loading image").font(.caption)
-                                Text(urlString).font(.caption2).lineLimit(1)
-                                HStack(spacing: 4) {
-                                    Button("Test") {
-                                        if let url = URL(string: urlString) {
-                                            UIApplication.shared.open(url)
-                                        }
-                                    }
-                                    .font(.caption2)
-                                    .padding(2)
-                                    .background(Color.blue.opacity(0.2))
-                                    .cornerRadius(2)
-
-                                    Button("Settings") {
-                                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                                            UIApplication.shared.open(url)
-                                        }
-                                    }
-                                    .font(.caption2)
-                                    .padding(2)
-                                    .background(Color.green.opacity(0.2))
-                                    .cornerRadius(2)
+            GeometryReader { geometry in
+                ZStack {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.08))
+                    if let urlString = product.media?.first, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: geometry.size.width, height: geometry.size.width)
+                                    .clipped()
+                            case .failure:
+                                VStack(spacing: 4) {
+                                    Image(systemName: "photo")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.gray)
                                 }
+                            @unknown default:
+                                Color.gray.opacity(0.1)
                             }
-                            .padding(4)
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(4)
-                        @unknown default:
-                            Color.gray.opacity(0.1)
+                        }
+                    } else {
+                        VStack(spacing: 4) {
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.gray)
                         }
                     }
-                    .frame(height: 120)
-                } else {
-                    VStack(spacing: 4) {
-                        Image(systemName: "photo")
-                        Text("No URL").font(.caption)
-                    }
-                    .frame(height: 120)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
                 }
+                .frame(width: geometry.size.width, height: geometry.size.width)
+                .clipped()
+                .cornerRadius(14)
             }
-            .frame(height: 200)
-            .clipped()
-            .cornerRadius(14)
+            .aspectRatio(1, contentMode: .fit)
             
             Text(product.name ?? "")
                 .font(.headline)
@@ -188,23 +167,25 @@ private struct ProductCard: View {
                     .lineLimit(2)
             }
             HStack {
-                Text("от \(Int(product.base_price ?? 0)) ₽")
-                    .font(.subheadline)
-                    .bold()
-                Spacer()
-                Button(action: onAdd) {
-                    Text("+")
-                        .font(.headline)
-                        .frame(width: 32, height: 32)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
+                Button(action: {}) {
+                    HStack(spacing: 4) {
+                        Text("от \(Int(product.base_price ?? 0)) ₽")
+                            .font(.subheadline)
+                            .bold()
+                        Image(systemName: "arrow.right")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(20)
                 }
+                .buttonStyle(.plain)
+                Spacer()
             }
         }
-        .padding(12)
         .background(Color.white)
         .cornerRadius(18)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
         .overlay(
             NavigationLink(destination: ProductDetailView(productId: product.id ?? 0)) {
                 EmptyView()

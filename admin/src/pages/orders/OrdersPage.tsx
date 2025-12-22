@@ -10,6 +10,14 @@ const fetchOrders = async (status?: string) => {
 }
 
 const statuses = ['new', 'pending_payment', 'paid', 'in_progress', 'delivered', 'cancelled']
+const statusLabels: Record<string, string> = {
+  new: 'Новый',
+  pending_payment: 'Ожидает оплаты',
+  paid: 'Оплачен',
+  in_progress: 'В работе',
+  delivered: 'Доставлен',
+  cancelled: 'Отменён',
+}
 
 export const OrdersPage = () => {
   const qc = useQueryClient()
@@ -24,23 +32,23 @@ export const OrdersPage = () => {
 
   const columns = [
     { title: 'ID', dataIndex: 'id' },
-    { title: 'User', dataIndex: 'user_id' },
-    { title: 'Total', dataIndex: 'total' },
-    { title: 'Delivery', dataIndex: 'delivery_type' },
-    { title: 'Created', dataIndex: 'created_at' },
-    { title: 'Status', dataIndex: 'status', render: (v: string) => <Tag>{v}</Tag> },
+    { title: 'Пользователь', dataIndex: 'user_id' },
+    { title: 'Сумма', dataIndex: 'total' },
+    { title: 'Доставка', dataIndex: 'delivery_type' },
+    { title: 'Создан', dataIndex: 'created_at' },
+    { title: 'Статус', dataIndex: 'status', render: (v: string) => <Tag>{statusLabels[v] || v}</Tag> },
     {
-      title: 'Actions',
+      title: 'Действия',
       render: (_: any, record: any) => (
         <Space>
-          <Link to={`/orders/${record.id}`}>Open</Link>
+          <Link to={`/orders/${record.id}`}>Открыть</Link>
           {['paid', 'in_progress', 'delivered'].map((next) => (
             <Button
               key={next}
               size="small"
               onClick={() => updateStatus.mutate({ id: record.id, status: next })}
             >
-              {next}
+              {statusLabels[next] || next}
             </Button>
           ))}
         </Space>
@@ -52,12 +60,12 @@ export const OrdersPage = () => {
     <>
       <Space style={{ marginBottom: 12 }}>
         <Select
-          placeholder="Filter status"
+          placeholder="Фильтр по статусу"
           allowClear
           value={status}
           onChange={setStatus}
           style={{ width: 200 }}
-          options={statuses.map((s) => ({ value: s, label: s }))}
+          options={statuses.map((s) => ({ value: s, label: statusLabels[s] || s }))}
         />
       </Space>
       <Table loading={isLoading} dataSource={data || []} columns={columns} rowKey="id" />
