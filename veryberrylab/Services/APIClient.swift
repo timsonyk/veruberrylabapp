@@ -54,7 +54,7 @@ final class APIClient {
         switch http.statusCode {
         case 200..<300:
             let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            // Note: Don't use .convertFromSnakeCase since our models already use snake_case property names
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
@@ -65,6 +65,12 @@ final class APIClient {
         default:
             throw APIError.server(status: http.statusCode)
         }
+    }
+    
+    /// Convenience method for JSON body as dictionary
+    func request<T: Decodable>(_ endpoint: [String], method: String = "GET", body: [String: Any], queryItems: [URLQueryItem]? = nil) async throws -> T {
+        let jsonData = try JSONSerialization.data(withJSONObject: body)
+        return try await request(endpoint, method: method, body: jsonData, queryItems: queryItems)
     }
 }
 

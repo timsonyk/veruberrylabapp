@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from pydantic import BaseModel
 
@@ -93,6 +93,7 @@ class ModificationOptionCreate(BaseModel):
     group_id: int
     name: str
     extra_price: float = 0
+    image_url: Optional[str] = None
     is_default: bool = False
     sort_order: int = 0
     is_active: bool = True
@@ -101,6 +102,7 @@ class ModificationOptionCreate(BaseModel):
 class ModificationOptionUpdate(BaseModel):
     name: Optional[str] = None
     extra_price: Optional[float] = None
+    image_url: Optional[str] = None
     is_default: Optional[bool] = None
     sort_order: Optional[int] = None
     is_active: Optional[bool] = None
@@ -164,9 +166,7 @@ class PickupLocationUpdate(BaseModel):
 
 class DeliveryZoneCreate(BaseModel):
     city: str
-    center_lat: float
-    center_lng: float
-    radius_meters: int
+    polygon: List[Any]
     delivery_fee: float
     sla_minutes: int = 180
     min_order_total: Optional[float] = None
@@ -176,9 +176,7 @@ class DeliveryZoneCreate(BaseModel):
 
 class DeliveryZoneUpdate(BaseModel):
     city: Optional[str] = None
-    center_lat: Optional[float] = None
-    center_lng: Optional[float] = None
-    radius_meters: Optional[int] = None
+    polygon: Optional[List[Any]] = None
     delivery_fee: Optional[float] = None
     sla_minutes: Optional[int] = None
     min_order_total: Optional[float] = None

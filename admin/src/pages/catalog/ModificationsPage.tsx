@@ -1,7 +1,17 @@
-import { Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag } from 'antd'
+import { Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Upload, Image } from 'antd'
+import { UploadOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../lib/api'
+
+const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await api.post('/admin/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data.url
+}
 
 const fetchGroups = async (product_id?: number) =>
   (await api.get('/admin/modification_groups', { params: product_id ? { product_id } : {} })).data
@@ -117,9 +127,15 @@ export const ModificationsPage = () => {
   ]
 
   const optionColumns = [
-    { title: 'ID', dataIndex: 'id' },
+    { title: 'ID', dataIndex: 'id', width: 60 },
+    { 
+      title: 'Фото', 
+      dataIndex: 'image_url', 
+      width: 80,
+      render: (url: string) => url ? <Image src={url} width={50} height={50} style={{ objectFit: 'cover', borderRadius: 4 }} /> : '-' 
+    },
     { title: 'Название', dataIndex: 'name' },
-    { title: 'Доплата', dataIndex: 'extra_price' },
+    { title: 'Доплата', dataIndex: 'extra_price', render: (v: number) => `${v} ₽` },
     { title: 'По умолчанию', dataIndex: 'is_default', render: (v: boolean) => (v ? 'Да' : 'Нет') },
     {
       title: 'Действия',
@@ -233,8 +249,34 @@ export const ModificationsPage = () => {
             <Input />
           </Form.Item>
           <Form.Item name="extra_price" label="Доплата" rules={[{ required: true }]}>
-            <InputNumber style={{ width: '100%' }} />
+            <InputNumber style={{ width: '100%' }} addonAfter="₽" />
           </Form.Item>
+          <Form.Item name="image_url" label="Изображение">
+            <Input 
+              placeholder="URL изображения" 
+              addonAfter={
+                <Upload
+                  showUploadList={false}
+                  beforeUpload={async (file) => {
+                    try {
+                      const url = await uploadImage(file)
+                      optionForm.setFieldValue('image_url', url)
+                    } catch (e) {
+                      console.error('Upload failed', e)
+                    }
+                    return false
+                  }}
+                >
+                  <UploadOutlined style={{ cursor: 'pointer' }} />
+                </Upload>
+              }
+            />
+          </Form.Item>
+          {optionForm.getFieldValue('image_url') && (
+            <Form.Item>
+              <Image src={optionForm.getFieldValue('image_url')} width={100} style={{ borderRadius: 8 }} />
+            </Form.Item>
+          )}
           <Form.Item name="sort_order" label="Порядок сортировки">
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>

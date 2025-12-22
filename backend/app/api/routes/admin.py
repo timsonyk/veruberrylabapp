@@ -3,7 +3,7 @@ import os
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query, UploadFile, File, Request
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.admin_deps import clear_admin_cookie, get_admin_user, set_admin_cookie
@@ -198,7 +198,7 @@ def delete_product_size(size_id: int, db: Session = Depends(get_db), user=Depend
 
 @router.get("/modification_groups")
 def list_modification_groups(product_id: Optional[int] = None, category_id: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_admin_user)):
-    q = db.query(cat_models.ModificationGroup)
+    q = db.query(cat_models.ModificationGroup).options(joinedload(cat_models.ModificationGroup.products))
     if product_id:
         q = q.join(cat_models.ModificationGroupProduct).filter(cat_models.ModificationGroupProduct.product_id == product_id)
     return q.order_by(cat_models.ModificationGroup.sort_order).all()
@@ -576,6 +576,7 @@ def list_users(limit: int = 100, db: Session = Depends(get_db), user=Depends(get
 # -------- Uploads --------
 @router.post("/upload")
 def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     user=Depends(get_admin_user),
 ):
@@ -586,7 +587,14 @@ def upload_file(
     file_path = os.path.join(settings.upload_dir, filename)
     with open(file_path, "wb") as f:
         f.write(file.file.read())
-    url = f"{str(settings.base_url).rstrip('/')}/uploads/{filename}"
+
+    # Build a public URL from the incoming request (supports ngrok/reverse proxies)
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host")
+    host = forwarded_host or request.headers.get("host") or request.url.netloc
+    scheme = forwarded_proto or request.url.scheme
+    base = f"{scheme}://{host}".rstrip("/")
+    url = f"{base}/uploads/{filename}"
     return {"url": url, "filename": filename}
 
 

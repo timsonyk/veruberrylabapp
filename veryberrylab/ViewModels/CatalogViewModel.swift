@@ -28,15 +28,10 @@ final class CatalogViewModel: ObservableObject {
         loading = false
     }
     
-    func selectCategory(id: Int?) async {
+    func selectCategory(id: Int?) {
+        // Category selection now only drives scrolling/highlighting in the UI.
+        // All products are loaded once and rendered in a single list grouped by category.
         selectedCategory = id
-        loading = true
-        do {
-            products = try await service.fetchProducts(categoryId: id)
-        } catch {
-            self.error = error.localizedDescription
-        }
-        loading = false
     }
 }
 

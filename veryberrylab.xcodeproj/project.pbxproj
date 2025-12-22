@@ -6,8 +6,15 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1B704CF328F304A2F3AC5888 /* Pods_veryberrylab.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4480A95AFB17E813850297AD /* Pods_veryberrylab.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		4480A95AFB17E813850297AD /* Pods_veryberrylab.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_veryberrylab.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		689459C8A7178B14B88A751F /* Pods-veryberrylab.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-veryberrylab.debug.xcconfig"; path = "Target Support Files/Pods-veryberrylab/Pods-veryberrylab.debug.xcconfig"; sourceTree = "<group>"; };
 		7BED1AFE2EE9AF6F00B16698 /* veryberrylab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = veryberrylab.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA9CCEE65BEA043E2245B56B /* Pods-veryberrylab.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-veryberrylab.release.xcconfig"; path = "Target Support Files/Pods-veryberrylab/Pods-veryberrylab.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,17 +43,28 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1B704CF328F304A2F3AC5888 /* Pods_veryberrylab.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3B02E9FDD3392D30ACF838DE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4480A95AFB17E813850297AD /* Pods_veryberrylab.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		7BED1AF52EE9AF6F00B16698 = {
 			isa = PBXGroup;
 			children = (
 				7BED1B002EE9AF6F00B16698 /* veryberrylab */,
 				7BED1AFF2EE9AF6F00B16698 /* Products */,
+				99BA7B56D061BF56196A0C2A /* Pods */,
+				3B02E9FDD3392D30ACF838DE /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -58,6 +76,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		99BA7B56D061BF56196A0C2A /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				689459C8A7178B14B88A751F /* Pods-veryberrylab.debug.xcconfig */,
+				DA9CCEE65BEA043E2245B56B /* Pods-veryberrylab.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -65,9 +92,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7BED1B0C2EE9AF7000B16698 /* Build configuration list for PBXNativeTarget "veryberrylab" */;
 			buildPhases = (
+				984ECA6BF5CC78E3884CCA5D /* [CP] Check Pods Manifest.lock */,
 				7BED1AFA2EE9AF6F00B16698 /* Sources */,
 				7BED1AFB2EE9AF6F00B16698 /* Frameworks */,
 				7BED1AFC2EE9AF6F00B16698 /* Resources */,
+				F88D67BD8E6455AC61C71C3F /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -77,8 +106,6 @@
 				7BED1B002EE9AF6F00B16698 /* veryberrylab */,
 			);
 			name = veryberrylab;
-			packageProductDependencies = (
-			);
 			productName = veryberrylab;
 			productReference = 7BED1AFE2EE9AF6F00B16698 /* veryberrylab.app */;
 			productType = "com.apple.product-type.application";
@@ -126,6 +153,48 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		984ECA6BF5CC78E3884CCA5D /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-veryberrylab-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		F88D67BD8E6455AC61C71C3F /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-veryberrylab/Pods-veryberrylab-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-veryberrylab/Pods-veryberrylab-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-veryberrylab/Pods-veryberrylab-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		7BED1AFA2EE9AF6F00B16698 /* Sources */ = {
@@ -259,6 +328,7 @@
 		};
 		7BED1B0D2EE9AF7000B16698 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 689459C8A7178B14B88A751F /* Pods-veryberrylab.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -267,6 +337,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"veryberrylab/Preview Content\"";
 				DEVELOPMENT_TEAM = BH5W66Q8G5;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = veryberrylab/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -289,6 +360,7 @@
 		};
 		7BED1B0E2EE9AF7000B16698 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA9CCEE65BEA043E2245B56B /* Pods-veryberrylab.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -297,6 +369,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"veryberrylab/Preview Content\"";
 				DEVELOPMENT_TEAM = BH5W66Q8G5;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = veryberrylab/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

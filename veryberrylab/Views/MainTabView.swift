@@ -7,10 +7,6 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Каталог", systemImage: "bag")
                 }
-            CartView()
-                .tabItem {
-                    Label("Корзина", systemImage: "cart")
-                }
             ProfileView()
                 .tabItem {
                     Label("Профиль", systemImage: "person")

@@ -7,10 +7,11 @@ final class ProductDetailViewModel: ObservableObject {
     @Published var error: String?
     @Published var selectedOptions: Set<Int> = []
     @Published var selectedSingle: [Int: Int] = [:] // groupId -> optionId
+    @Published var quantity: Int = 1
     
     private let service = CatalogService()
     
-    var computedPrice: Double {
+    var unitPrice: Double {
         guard let product else { return 0 }
         let modsSum = (product.modification_groups ?? []).flatMap { group -> [Double] in
             let gid = group.id ?? 0
@@ -26,11 +27,28 @@ final class ProductDetailViewModel: ObservableObject {
         return (product.base_price ?? 0) + modsSum
     }
     
+    var totalPrice: Double {
+        unitPrice * Double(quantity)
+    }
+    
     func load(productId: Int) async {
         loading = true
         do {
             let p = try await service.fetchProduct(id: productId)
             product = p
+            // Auto-select default options
+            for group in p.modification_groups ?? [] {
+                let gid = group.id ?? 0
+                for opt in group.options ?? [] {
+                    if opt.is_default == true, let optId = opt.id {
+                        if (group.type ?? "single") == "single" {
+                            selectedSingle[gid] = optId
+                        } else {
+                            selectedOptions.insert(optId)
+                        }
+                    }
+                }
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -42,13 +60,38 @@ final class ProductDetailViewModel: ObservableObject {
         let oid = option.id ?? 0
         let isSingle = (group.type ?? "single") == "single"
         if isSingle {
-            selectedSingle[gid] = oid
+            if selectedSingle[gid] == oid {
+                selectedSingle.removeValue(forKey: gid)
+            } else {
+                selectedSingle[gid] = oid
+            }
         } else {
             if selectedOptions.contains(oid) {
                 selectedOptions.remove(oid)
             } else {
                 selectedOptions.insert(oid)
             }
+        }
+    }
+    
+    func isOptionSelected(group: ModificationGroupDTO, option: ModificationOptionDTO) -> Bool {
+        let gid = group.id ?? 0
+        let oid = option.id ?? 0
+        let isSingle = (group.type ?? "single") == "single"
+        if isSingle {
+            return selectedSingle[gid] == oid
+        } else {
+            return selectedOptions.contains(oid)
+        }
+    }
+    
+    func increment() {
+        quantity += 1
+    }
+    
+    func decrement() {
+        if quantity > 1 {
+            quantity -= 1
         }
     }
     

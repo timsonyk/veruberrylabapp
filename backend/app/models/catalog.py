@@ -101,6 +101,7 @@ class ModificationOption(Base):
     group_id = Column(Integer, ForeignKey("modification_groups.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     extra_price = Column(Numeric(10, 2), default=0, nullable=False)
+    image_url = Column(String(500), nullable=True)
     is_default = Column(Boolean, default=False, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -182,13 +183,10 @@ class DeliveryZone(Base):
 
     id = Column(Integer, primary_key=True)
     city = Column(String(50), nullable=False)
-    center_lat = Column(Float, nullable=False)
-    center_lng = Column(Float, nullable=False)
-    radius_meters = Column(Integer, nullable=False)
+    polygon = Column(JSON, nullable=True)
     delivery_fee = Column(Numeric(10, 2), nullable=False)
     sla_minutes = Column(Integer, default=180, nullable=False)
     min_order_total = Column(Numeric(10, 2), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-

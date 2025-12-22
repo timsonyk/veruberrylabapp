@@ -28,6 +28,7 @@ class ModificationOptionOut(BaseModel):
     id: int
     name: str
     extra_price: float
+    image_url: Optional[str] = None
     is_default: bool
     sort_order: int
     is_active: bool

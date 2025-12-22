@@ -3,9 +3,26 @@ import Foundation
 @MainActor
 final class CartViewModel: ObservableObject {
     @Published var items: [CartItem] = []
+    @Published var promoCode: String = ""
+    @Published var appliedPromo: PromoCode?
+    @Published var orderComment: String = ""
+    @Published var doNotCall: Bool = false
+    @Published var isApplyingPromo: Bool = false
+    @Published var promoError: String?
+    
+    // Cashback percentage (could come from server)
+    private let cashbackPercentage: Double = 5.0
+    
+    var itemsCount: Int {
+        items.reduce(0) { $0 + $1.quantity }
+    }
     
     var subtotal: Double {
         items.reduce(0) { $0 + $1.totalPrice }
+    }
+    
+    var promoDiscount: Double {
+        appliedPromo?.calculateDiscount(for: subtotal) ?? 0
     }
     
     var deliveryFee: Double {
@@ -13,7 +30,11 @@ final class CartViewModel: ObservableObject {
     }
     
     var total: Double {
-        subtotal + deliveryFee
+        max(0, subtotal - promoDiscount + deliveryFee)
+    }
+    
+    var earnedBonuses: Int {
+        Int(subtotal * cashbackPercentage / 100)
     }
     
     func add(product: ProductDTO, options: [SelectedOption]) {
@@ -50,5 +71,64 @@ final class CartViewModel: ObservableObject {
     func remove(_ item: CartItem) {
         items.removeAll { $0.id == item.id }
     }
+    
+    func clearCart() {
+        items.removeAll()
+        appliedPromo = nil
+        promoCode = ""
+        orderComment = ""
+        doNotCall = false
+    }
+    
+    // MARK: - Promo Code
+    
+    func applyPromoCode() async {
+        guard !promoCode.isEmpty else { return }
+        
+        isApplyingPromo = true
+        promoError = nil
+        
+        // TODO: Replace with actual API call
+        // Simulating API call
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        
+        // Demo promo codes
+        if promoCode.uppercased() == "SALE10" {
+            appliedPromo = PromoCode(
+                code: promoCode.uppercased(),
+                discountType: .percentage,
+                discountValue: 10,
+                minOrderAmount: 1000,
+                maxDiscount: 1000,
+                isActive: true
+            )
+        } else if promoCode.uppercased() == "FIRST500" {
+            appliedPromo = PromoCode(
+                code: promoCode.uppercased(),
+                discountType: .fixed,
+                discountValue: 500,
+                minOrderAmount: 3000,
+                maxDiscount: nil,
+                isActive: true
+            )
+        } else {
+            promoError = "Промокод не найден"
+            appliedPromo = nil
+        }
+        
+        isApplyingPromo = false
+    }
+    
+    func removePromoCode() {
+        appliedPromo = nil
+        promoCode = ""
+        promoError = nil
+    }
+    
+    // MARK: - Recommendations
+    
+    func getRecommendations() -> [ProductDTO] {
+        // TODO: Fetch from API
+        return []
+    }
 }
-

@@ -18,6 +18,7 @@ struct ModificationOptionDTO: Codable, Identifiable {
     let id: Int?
     let name: String?
     let extra_price: Double?
+    let image_url: String?
     let is_default: Bool?
     let sort_order: Int?
     let is_active: Bool?

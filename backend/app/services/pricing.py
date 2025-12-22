@@ -17,18 +17,21 @@ from app.models.catalog import (
 from app.models.order import DeliveryType
 
 
-def _haversine_distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """
-    Returns distance in meters using haversine formula.
-    """
-    R = 6371000  # meters
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lng2 - lng1)
-
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
+def _point_in_polygon(lat: float, lng: float, polygon: Optional[list[list[float]]]) -> bool:
+    if not polygon:
+        return False
+    inside = False
+    j = len(polygon) - 1
+    for i in range(len(polygon)):
+        xi, yi = polygon[i]
+        xj, yj = polygon[j]
+        intersects = ((yi > lat) != (yj > lat)) and (
+            lng < (xj - xi) * (lat - yi) / (yj - yi) + xi
+        )
+        if intersects:
+            inside = not inside
+        j = i
+    return inside
 
 
 def _find_delivery_zone(db: Session, city: str, lat: float, lng: float) -> Optional[DeliveryZone]:
@@ -39,8 +42,7 @@ def _find_delivery_zone(db: Session, city: str, lat: float, lng: float) -> Optio
         .all()
     )
     for zone in zones:
-        dist = _haversine_distance_m(lat, lng, zone.center_lat, zone.center_lng)
-        if dist <= zone.radius_meters:
+        if zone.polygon and _point_in_polygon(lat, lng, zone.polygon):
             return zone
     return None
 
