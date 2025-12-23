@@ -23,6 +23,7 @@ struct AddressSelectionView: View {
     @State private var deliveryZones: [DeliveryZoneDTO] = []
     @State private var mapRefreshID = UUID() // Для принудительного обновления карты
     @State private var showCityPicker = false
+    @State private var debounceTimer: Timer? // Для debounce геокодирования
     
     // Pickup points (магазины самовывоза)
     private let pickupPoints: [String: [PickupPoint]] = [
@@ -640,6 +641,9 @@ struct AddNewAddressMapView: View {
     @State private var deliveryAvailable = false
     @State private var deliveryTime: Int?
     
+    // Debounce timer для геокодирования
+    @State private var geocodeTimer: Timer?
+    
     init(onAddressAdded: (() -> Void)? = nil) {
         self.onAddressAdded = onAddressAdded
         // Инициализируем mapRegion в зависимости от выбранного города через @AppStorage или дефолтное значение
@@ -657,10 +661,16 @@ struct AddNewAddressMapView: View {
                 region: $mapRegion,
                 isMoving: $isMapMoving,
                 onRegionChanged: { region in
-                    // Разрешаем карте свободно двигаться и обновлять адрес
+                    // Разрешаем карте свободно двигаться
                     if !isProgrammaticMove {
-                        geocodeLocation(region.center)
-                        checkDeliveryZone(coordinate: region.center)
+                        // Отменяем предыдущий таймер
+                        geocodeTimer?.invalidate()
+                        
+                        // Запускаем новый таймер (debounce)
+                        geocodeTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+                            geocodeLocation(region.center)
+                            checkDeliveryZone(coordinate: region.center)
+                        }
                     }
                     // Сбрасываем флаг сразу после первого callback
                     isProgrammaticMove = false
@@ -826,7 +836,6 @@ struct AddNewAddressMapView: View {
                 span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
             )
             mapRefreshID = UUID()
-            isProgrammaticMove = false
             geocodeLocation(loc.coordinate)
             checkDeliveryZone(coordinate: loc.coordinate)
         }

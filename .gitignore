@@ -1,15 +1,51 @@
-# CocoaPods
-Pods/
+# macOS
+.DS_Store
 
-# Xcode
+# Xcode / iOS
 DerivedData/
 build/
 *.xcuserstate
 *.xcuserdata
+xcuserdata/
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xccheckout
+
+# Workspaces / projects
+*.xcworkspace
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Archives / symbols / logs
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcarchive
 *.log
 
-# macOS
-.DS_Store
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
 
 # Images / Media (если есть тяжёлые)
 *.psd
@@ -17,10 +53,33 @@ build/
 *.mov
 *.z
 
-Pods/
-DerivedData/
-*.xcworkspace
-*.xcuserstate
-*.xcuserdata
-*.ipa
-*.dSYM
+# Frontend (admin)
+admin/node_modules/
+admin/dist/
+admin/.vite/
+admin/.eslintcache
+
+# Backend (python)
+backend/venv/
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache
+backend/.coverage
+backend/.cache/
+backend/uploads/
+
+# Env / secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+
+# Editors / misc
+.idea/
+.vscode/
+*.orig
+*.swp
+*.swo
