@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
     @Published var selectedAddress: DeliveryAddress?
     @Published var selectedPickupPoint: PickupPoint?
     @Published var selectedTimeSlot: DeliveryTimeSlot = .asap
+    @Published var selectedCity: String = "Москва"
     
     // MARK: - Delivery Info (from server)
     @Published var deliveryFee: Double = 700.0
@@ -164,7 +165,7 @@ final class AppState: ObservableObject {
         isCheckingDelivery = true
         
         do {
-            let response = try await catalogService.checkDelivery(lat: lat, lng: lng)
+            let response = try await catalogService.checkDelivery(lat: lat, lng: lng, city: selectedCity)
             deliveryFee = response.delivery_fee
             deliverySLAMinutes = response.sla_minutes
             minOrderTotal = response.min_order_total

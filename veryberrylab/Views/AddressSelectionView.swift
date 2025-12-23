@@ -17,6 +17,7 @@ struct AddressSelectionView: View {
     @State private var isMapMoving = false
     @State private var addressToDelete: DeliveryAddress?
     @State private var showDeleteConfirmation = false
+    @State private var shouldFollowUserLocation = false
     
     var body: some View {
         NavigationView {
@@ -34,6 +35,9 @@ struct AddressSelectionView: View {
                 // Delivery Type Picker Overlay
                 VStack {
                     deliveryTypePicker
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                    citySelector
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
                     Spacer()
@@ -71,7 +75,11 @@ struct AddressSelectionView: View {
             }
         }
         .onAppear {
+            updateRegionToCityCenterIfNeeded()
             updateMapRegion()
+        }
+        .onChange(of: appState.selectedCity) { _ in
+            updateRegionToCityCenterIfNeeded()
         }
     }
     
@@ -121,6 +129,31 @@ struct AddressSelectionView: View {
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
     }
     
+    // MARK: - City Selector
+    private var citySelector: some View {
+        HStack(spacing: 8) {
+            ForEach(["Москва", "Санкт-Петербург"], id: \.self) { city in
+                let isSelected = appState.selectedCity == city
+                Button {
+                    withAnimation {
+                        appState.selectedCity = city
+                        updateRegionToCityCenterIfNeeded()
+                    }
+                } label: {
+                    Text(city)
+                        .font(.subheadline)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundColor(isSelected ? .white : .primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(isSelected ? Color.red : Color(.systemGray6))
+                        .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+    
     // MARK: - Bottom Navigation
     
     private var bottomNavigationButtons: some View {
@@ -159,7 +192,7 @@ struct AddressSelectionView: View {
             
             // Location Button
             Button {
-                // TODO: Get current location
+                NotificationCenter.default.post(name: .addressAdded, object: nil) // no-op placeholder to keep button; main location handled in AddNewAddressMapView
             } label: {
                 Image(systemName: "location.fill")
                     .font(.title3)
@@ -266,6 +299,23 @@ struct AddressSelectionView: View {
                     span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                 )
             }
+        }
+    }
+    
+    private func updateRegionToCityCenterIfNeeded() {
+        guard appState.selectedAddress == nil else { return }
+        let center = cityCenter(for: appState.selectedCity)
+        withAnimation {
+            mapRegion = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08))
+        }
+    }
+    
+    private func cityCenter(for city: String) -> CLLocationCoordinate2D {
+        switch city {
+        case "Санкт-Петербург":
+            return CLLocationCoordinate2D(latitude: 59.9386, longitude: 30.3141)
+        default: // Москва
+            return CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173)
         }
     }
 }
@@ -415,13 +465,14 @@ struct AddNewAddressMapView: View {
     
     @StateObject private var locationManager = LocationManager()
     @State private var mapRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173), // Москва центр
+        center: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
     )
     @State private var isMapMoving = false
     @State private var detectedAddress: String = "Определяем адрес..."
     @State private var showAddressForm = false
     @State private var selectedCoordinate: CLLocationCoordinate2D?
+    @State private var followUser = false
     
     var body: some View {
         ZStack {
@@ -511,13 +562,10 @@ struct AddNewAddressMapView: View {
                 HStack {
                     Spacer()
                     Button {
+                        followUser = true
+                        locationManager.requestPermission()
                         if let location = locationManager.lastLocation {
-                            withAnimation {
-                                mapRegion = MKCoordinateRegion(
-                                    center: location.coordinate,
-                                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                                )
-                            }
+                            centerMap(on: location.coordinate)
                         }
                     } label: {
                         Image(systemName: "location.fill")
@@ -546,7 +594,16 @@ struct AddNewAddressMapView: View {
         }
         .onAppear {
             locationManager.requestPermission()
+            centerToSelectedCityIfNeeded()
             geocodeLocation(mapRegion.center)
+        }
+        .onChange(of: locationManager.lastLocation) { location in
+            guard followUser, let loc = location else { return }
+            centerMap(on: loc.coordinate)
+            followUser = false
+        }
+        .onChange(of: appState.selectedCity) { _ in
+            centerToSelectedCityIfNeeded()
         }
     }
     
@@ -613,6 +670,7 @@ struct AddNewAddressMapView: View {
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
     }
     
+    // MARK: - Helpers
     // MARK: - Geocoding
     
     private func geocodeLocation(_ coordinate: CLLocationCoordinate2D) {
@@ -680,6 +738,7 @@ struct MapViewWithCenterTracking: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        if isMoving { return } // user gesture in progress
         let currentCenter = mapView.region.center
         let newCenter = region.center
         let distance = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
@@ -687,6 +746,26 @@ struct MapViewWithCenterTracking: UIViewRepresentable {
         
         if distance > 100 {
             mapView.setRegion(region, animated: true)
+        }
+    }
+    
+    private func centerMap(on coordinate: CLLocationCoordinate2D) {
+        withAnimation {
+            mapRegion = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
+        }
+    }
+    
+    private func centerToSelectedCityIfNeeded() {
+        let center = cityCenter(for: appState.selectedCity)
+        centerMap(on: center)
+    }
+    
+    private func cityCenter(for city: String) -> CLLocationCoordinate2D {
+        switch city {
+        case "Санкт-Петербург":
+            return CLLocationCoordinate2D(latitude: 59.9386, longitude: 30.3141)
+        default:
+            return CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173)
         }
     }
     
@@ -748,6 +827,7 @@ struct YandexMapWithCenterTracking: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: YMKMapView, context: Context) {
+        if isMoving { return } // skip while user drags
         guard let mapWindow = mapView.mapWindow else { return }
         let map = mapWindow.map
         let current = map.cameraPosition.target
