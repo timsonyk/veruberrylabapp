@@ -1,0 +1,18 @@
+# CocoaPods
+Pods/
+
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+*.xcuserdata
+*.log
+
+# macOS
+.DS_Store
+
+# Images / Media (если есть тяжёлые)
+*.psd
+*.mp4
+*.mov
+*.z
