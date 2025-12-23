@@ -8,7 +8,8 @@ import YandexMapsMobile
 struct AddressSelectionView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
-    
+
+    @StateObject private var locationManager = LocationManager()
     @State private var showAddNewAddress = false
     @State private var mapRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 55.7330, longitude: 37.5847),
@@ -18,6 +19,20 @@ struct AddressSelectionView: View {
     @State private var addressToDelete: DeliveryAddress?
     @State private var showDeleteConfirmation = false
     @State private var shouldFollowUserLocation = false
+    @State private var isProgrammaticMove = false
+    @State private var deliveryZones: [DeliveryZoneDTO] = []
+    @State private var mapRefreshID = UUID() // Для принудительного обновления карты
+    @State private var showCityPicker = false
+    
+    // Pickup points (магазины самовывоза)
+    private let pickupPoints: [String: [PickupPoint]] = [
+        "Москва": [
+            PickupPoint(id: 1, name: "Very Berry Lab Москва", address: "Москва, ул. Тверская, 1", latitude: 55.7558, longitude: 37.6173, workingHours: "Пн-Вс 10:00-22:00")
+        ],
+        "Санкт-Петербург": [
+            PickupPoint(id: 2, name: "Very Berry Lab СПб", address: "Санкт-Петербург, Невский проспект, 1", latitude: 59.9343, longitude: 30.3351, workingHours: "Пн-Вс 10:00-22:00")
+        ]
+    ]
     
     var body: some View {
         NavigationView {
@@ -27,21 +42,13 @@ struct AddressSelectionView: View {
                     region: $mapRegion,
                     isMoving: $isMapMoving,
                     onRegionChanged: { region in
-                        updateMapRegion(region: region)
+                        // Игнорируем programmatic moves
+                        guard !isProgrammaticMove else { return }
+                        // Карта уже на нужной позиции после user gesture
                     }
                 )
+                .id(mapRefreshID) // Обновляем карту при изменении ID
                 .ignoresSafeArea(edges: .top)
-                
-                // Delivery Type Picker Overlay
-                VStack {
-                    deliveryTypePicker
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                    citySelector
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                    Spacer()
-                }
                 
                 // Bottom navigation buttons
                 bottomNavigationButtons
@@ -54,8 +61,11 @@ struct AddressSelectionView: View {
         .fullScreenCover(isPresented: $showAddNewAddress) {
             AddNewAddressMapView(onAddressAdded: {
                 showAddNewAddress = false
-                updateMapRegion()
+                // НЕ двигаем камеру после сохранения
             })
+        }
+        .sheet(isPresented: $showCityPicker) {
+            cityPickerSheet
         }
         .alert("Удалить адрес?", isPresented: $showDeleteConfirmation) {
             Button("Отмена", role: .cancel) {
@@ -75,11 +85,30 @@ struct AddressSelectionView: View {
             }
         }
         .onAppear {
-            updateRegionToCityCenterIfNeeded()
             updateMapRegion()
+            loadDeliveryZones()
         }
-        .onChange(of: appState.selectedCity) { _ in
-            updateRegionToCityCenterIfNeeded()
+        .onChange(of: locationManager.lastLocation) { location in
+            guard let loc = location else {
+                print("⚠️ Location is nil")
+                return
+            }
+            
+            guard shouldFollowUserLocation else {
+                print("⚠️ shouldFollowUserLocation is false, ignoring location update")
+                return
+            }
+            
+            print("🎯 Moving map to user location: \(loc.coordinate.latitude), \(loc.coordinate.longitude)")
+            
+            // Programmatic move к user location
+            isProgrammaticMove = true
+            mapRegion = MKCoordinateRegion(
+                center: loc.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
+            )
+            shouldFollowUserLocation = false
+            isProgrammaticMove = false
         }
     }
     
@@ -95,63 +124,6 @@ struct AddressSelectionView: View {
             )]
         }
         return []
-    }
-    
-    // MARK: - Delivery Type Picker
-    
-    private var deliveryTypePicker: some View {
-        HStack(spacing: 0) {
-            ForEach(DeliveryType.allCases) { type in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        appState.deliveryType = type
-                    }
-                } label: {
-                    Text(type.title)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(appState.deliveryType == type ? .white : .secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            appState.deliveryType == type
-                                ? Color.red
-                                : Color.clear
-                        )
-                        .cornerRadius(10)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(Color.white)
-        .cornerRadius(14)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
-    }
-    
-    // MARK: - City Selector
-    private var citySelector: some View {
-        HStack(spacing: 8) {
-            ForEach(["Москва", "Санкт-Петербург"], id: \.self) { city in
-                let isSelected = appState.selectedCity == city
-                Button {
-                    withAnimation {
-                        appState.selectedCity = city
-                        updateRegionToCityCenterIfNeeded()
-                    }
-                } label: {
-                    Text(city)
-                        .font(.subheadline)
-                        .fontWeight(isSelected ? .semibold : .regular)
-                        .foregroundColor(isSelected ? .white : .primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(isSelected ? Color.red : Color(.systemGray6))
-                        .cornerRadius(10)
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
     
     // MARK: - Bottom Navigation
@@ -171,42 +143,30 @@ struct AddressSelectionView: View {
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             }
-            
+
             Spacer()
             
-            // City Label
-            HStack(spacing: 6) {
-                Image(systemName: "mappin.circle.fill")
-                    .foregroundColor(.red)
-                Text("Москва")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .cornerRadius(24)
-            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-            
-            Spacer()
-            
-            // Location Button
+            // City Picker Button
             Button {
-                NotificationCenter.default.post(name: .addressAdded, object: nil) // no-op placeholder to keep button; main location handled in AddNewAddressMapView
+                showCityPicker = true
             } label: {
-                Image(systemName: "location.fill")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                    .frame(width: 48, height: 48)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                HStack(spacing: 6) {
+                    Text(appState.selectedCity)
+                        .font(.body)
+                        .fontWeight(.medium)
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                }
+                .foregroundColor(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.white)
+                .cornerRadius(24)
+                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             }
         }
         .padding(.horizontal, 16)
-        // подняли выше, чтобы не накладывалось на панель адресов
-        .padding(.bottom, 420)
+        .padding(.bottom, 450)
     }
     
     // MARK: - Address List Sheet
@@ -219,9 +179,22 @@ struct AddressSelectionView: View {
                 .frame(width: 36, height: 5)
                 .padding(.top, 8)
             
+            // Delivery Type Picker (Доставка / Самовывоз)
+            Picker("", selection: $appState.deliveryType) {
+                ForEach(DeliveryType.allCases) { type in
+                    Text(type.title).tag(type)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .onChange(of: appState.deliveryType) { newType in
+                handleDeliveryTypeChange(newType)
+            }
+            
             // Title
             HStack {
-                Text("Мои адреса")
+                Text(appState.deliveryType == .delivery ? "Мои адреса" : "Пункты самовывоза")
                     .font(.title2)
                     .fontWeight(.bold)
                 Spacer()
@@ -232,6 +205,22 @@ struct AddressSelectionView: View {
             Divider()
                 .padding(.top, 12)
             
+            // Content based on delivery type
+            if appState.deliveryType == .delivery {
+                deliveryAddressListContent
+            } else {
+                pickupPointsListContent
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(20, corners: [.topLeft, .topRight])
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
+    }
+    
+    // MARK: - Delivery Address List Content
+    
+    private var deliveryAddressListContent: some View {
+        VStack(spacing: 0) {
             // Address List
             ScrollView {
                 VStack(spacing: 0) {
@@ -241,7 +230,7 @@ struct AddressSelectionView: View {
                             isSelected: appState.selectedAddress?.id == address.id,
                             onSelect: {
                                 appState.selectAddress(address)
-                                updateMapRegion()
+                                moveMapToAddress(address)
                             },
                             onDelete: {
                                 addressToDelete = address
@@ -276,46 +265,220 @@ struct AddressSelectionView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
         }
-        .background(Color(.systemBackground))
-        .cornerRadius(20, corners: [.topLeft, .topRight])
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
+    }
+    
+    // MARK: - Pickup Points List Content
+    
+    private var pickupPointsListContent: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    if let points = pickupPoints[appState.selectedCity] {
+                        ForEach(points) { point in
+                            PickupPointRow(
+                                point: point,
+                                isSelected: appState.selectedPickupPoint?.id == point.id,
+                                onSelect: {
+                                    appState.selectedPickupPoint = point
+                                    moveMapToPickupPoint(point)
+                                }
+                            )
+                            
+                            Divider()
+                                .padding(.leading, 16)
+                        }
+                    } else {
+                        Text("Нет доступных пунктов самовывоза в выбранном городе")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .padding()
+                    }
+                }
+            }
+            .frame(maxHeight: 200)
+        }
+        .padding(.vertical, 16)
+    }
+    
+    // MARK: - City Picker Sheet
+    
+    private var cityPickerSheet: some View {
+        VStack(spacing: 0) {
+            // Handle
+            Capsule()
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+            
+            // Title
+            Text("Выберите город")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.bottom, 20)
+            
+            // Cities
+            VStack(spacing: 0) {
+                ForEach(["Москва", "Санкт-Петербург"], id: \.self) { city in
+                    Button {
+                        selectCity(city)
+                        showCityPicker = false
+                    } label: {
+                        HStack {
+                            Text(city)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if appState.selectedCity == city {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                    }
+                    
+                    if city != "Санкт-Петербург" {
+                        Divider()
+                    }
+                }
+            }
+            .background(Color(.systemGray6))
+            .cornerRadius(14)
+            .padding(.horizontal, 16)
+            
+            Spacer()
+        }
+        .presentationDetents([.height(280)])
     }
     
     // MARK: - Helpers
     
-    private func updateMapRegion(region: MKCoordinateRegion) {
-        withAnimation {
-            mapRegion = region
-        }
+    private func moveMapToAddress(_ address: DeliveryAddress) {
+        guard let lat = address.latitude,
+              let lon = address.longitude else { return }
+        
+        print("🎯 Moving map to address: \(lat), \(lon)")
+        
+        isProgrammaticMove = true
+        
+        // Обновляем регион И ID карты для принудительного обновления
+        mapRegion = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+            span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
+        )
+        mapRefreshID = UUID()
+        isProgrammaticMove = false
     }
     
     private func updateMapRegion() {
-        if let address = appState.selectedAddress,
-           let lat = address.latitude,
-           let lon = address.longitude {
-            withAnimation {
-                mapRegion = MKCoordinateRegion(
-                    center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                    span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-                )
+        guard let address = appState.selectedAddress else { return }
+        moveMapToAddress(address)
+    }
+    
+    private func loadDeliveryZones() {
+        Task {
+            do {
+                deliveryZones = try await appState.catalogService.fetchDeliveryZones()
+            } catch {
+                // Игнорируем ошибку загрузки зон
             }
         }
     }
     
-    private func updateRegionToCityCenterIfNeeded() {
-        guard appState.selectedAddress == nil else { return }
-        let center = cityCenter(for: appState.selectedCity)
-        withAnimation {
-            mapRegion = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08))
+    private func handleDeliveryTypeChange(_ newType: DeliveryType) {
+        if newType == .pickup {
+            // При переключении на самовывоз, показываем первый доступный магазин
+            if let points = pickupPoints[appState.selectedCity], let firstPoint = points.first {
+                appState.selectedPickupPoint = firstPoint
+                moveMapToPickupPoint(firstPoint)
+            }
         }
     }
     
-    private func cityCenter(for city: String) -> CLLocationCoordinate2D {
-        switch city {
-        case "Санкт-Петербург":
-            return CLLocationCoordinate2D(latitude: 59.9386, longitude: 30.3141)
-        default: // Москва
-            return CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173)
+    private func moveMapToPickupPoint(_ point: PickupPoint) {
+        print("🎯 Moving map to pickup point: \(point.latitude), \(point.longitude)")
+        
+        isProgrammaticMove = true
+        
+        mapRegion = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude),
+            span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
+        )
+        mapRefreshID = UUID()
+        isProgrammaticMove = false
+    }
+    
+    private func selectCity(_ city: String) {
+        appState.selectedCity = city
+        
+        // Определяем координаты города
+        let cityCoordinates: [String: CLLocationCoordinate2D] = [
+            "Москва": CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
+            "Санкт-Петербург": CLLocationCoordinate2D(latitude: 59.9343, longitude: 30.3351)
+        ]
+        
+        guard let coordinate = cityCoordinates[city] else { return }
+        
+        isProgrammaticMove = true
+        
+        mapRegion = MKCoordinateRegion(
+            center: coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+        )
+        mapRefreshID = UUID()
+        isProgrammaticMove = false
+        
+        // Если режим самовывоза, выбираем первый магазин в городе
+        if appState.deliveryType == .pickup,
+           let points = pickupPoints[city],
+           let firstPoint = points.first {
+            appState.selectedPickupPoint = firstPoint
+            moveMapToPickupPoint(firstPoint)
+        }
+    }
+}
+
+// MARK: - Pickup Point Row
+
+struct PickupPointRow: View {
+    let point: PickupPoint
+    let isSelected: Bool
+    let onSelect: () -> Void
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(isSelected ? .blue : .gray)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(point.name)
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    Text(point.address)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    if let hours = point.workingHours {
+                        Text(hours)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.blue)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
     }
 }
@@ -460,19 +623,33 @@ struct RoundedCorner: Shape {
 struct AddNewAddressMapView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
-    
+
     var onAddressAdded: (() -> Void)?
-    
+
     @StateObject private var locationManager = LocationManager()
-    @State private var mapRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
-        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-    )
+    @State private var mapRegion: MKCoordinateRegion
     @State private var isMapMoving = false
     @State private var detectedAddress: String = "Определяем адрес..."
     @State private var showAddressForm = false
     @State private var selectedCoordinate: CLLocationCoordinate2D?
-    @State private var followUser = false
+    @State private var isProgrammaticMove = false
+    @State private var shouldFollowUserLocation = false
+    @State private var mapRefreshID = UUID() // Для принудительного обновления карты
+
+    // Delivery zone check
+    @State private var isCheckingDelivery = false
+    @State private var deliveryAvailable = false
+    @State private var deliveryTime: Int?
+    
+    init(onAddressAdded: (() -> Void)? = nil) {
+        self.onAddressAdded = onAddressAdded
+        // Инициализируем mapRegion в зависимости от выбранного города через @AppStorage или дефолтное значение
+        // Временно используем дефолтную Москву, обновим в onAppear
+        _mapRegion = State(initialValue: MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        ))
+    }
     
     var body: some View {
         ZStack {
@@ -481,9 +658,13 @@ struct AddNewAddressMapView: View {
                 region: $mapRegion,
                 isMoving: $isMapMoving,
                 onRegionChanged: { region in
+                    // Игнорируем programmatic moves
+                    guard !isProgrammaticMove else { return }
                     geocodeLocation(region.center)
+                    checkDeliveryZone(coordinate: region.center)
                 }
             )
+            .id(mapRefreshID) // Обновляем карту при изменении ID
             .ignoresSafeArea()
             
             // Center Pin (always fixed in center)
@@ -549,36 +730,54 @@ struct AddNewAddressMapView: View {
                 Spacer()
             }
             
-            // Bottom Sheet
-            VStack {
-                Spacer()
-                
-                addressBottomSheet
-            }
-            
-            // My Location Button
+            // Location Button (floating, lower position)
             VStack {
                 Spacer()
                 HStack {
                     Spacer()
                     Button {
-                        followUser = true
-                        locationManager.requestPermission()
+                        print("🔵 'Найди меня' button tapped (AddNewAddressMapView)")
+                        
+                        // Если уже есть локация - принудительно обновляем карту
                         if let location = locationManager.lastLocation {
-                            centerMap(on: location.coordinate)
+                            print("🎯 Jumping to location: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+                            
+                            isProgrammaticMove = true
+                            
+                            // Обновляем регион И ID карты с БОЛЬШИМ приближением
+                            mapRegion = MKCoordinateRegion(
+                                center: location.coordinate,
+                                span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
+                            )
+                            mapRefreshID = UUID()
+                            isProgrammaticMove = false
+                            geocodeLocation(location.coordinate)
+                            checkDeliveryZone(coordinate: location.coordinate)
+                        } else {
+                            print("🔵 No location yet, requesting permission")
+                            shouldFollowUserLocation = true
+                            locationManager.requestPermission()
                         }
                     } label: {
                         Image(systemName: "location.fill")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-                            .frame(width: 48, height: 48)
+                            .font(.title2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                            .frame(width: 52, height: 52)
                             .background(Color.white)
                             .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
                     }
                 }
                 .padding(.trailing, 16)
-                .padding(.bottom, 200)
+                .padding(.bottom, 280) // Над нижним sheet'ом
+            }
+            
+            // Bottom Sheet
+            VStack {
+                Spacer()
+                
+                addressBottomSheet
             }
         }
         .sheet(isPresented: $showAddressForm) {
@@ -593,17 +792,41 @@ struct AddNewAddressMapView: View {
             )
         }
         .onAppear {
-            locationManager.requestPermission()
-            centerToSelectedCityIfNeeded()
+            // Устанавливаем карту на выбранный город
+            let cityCoordinates: [String: CLLocationCoordinate2D] = [
+                "Москва": CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173),
+                "Санкт-Петербург": CLLocationCoordinate2D(latitude: 59.9343, longitude: 30.3351)
+            ]
+            
+            if let coordinate = cityCoordinates[appState.selectedCity] {
+                mapRegion = MKCoordinateRegion(
+                    center: coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                )
+            }
+            
             geocodeLocation(mapRegion.center)
+            checkDeliveryZone(coordinate: mapRegion.center)
         }
         .onChange(of: locationManager.lastLocation) { location in
-            guard followUser, let loc = location else { return }
-            centerMap(on: loc.coordinate)
-            followUser = false
-        }
-        .onChange(of: appState.selectedCity) { _ in
-            centerToSelectedCityIfNeeded()
+            guard shouldFollowUserLocation, let loc = location else {
+                return
+            }
+            
+            print("🎯 Jumping to user location (AddNewAddressMapView): \(loc.coordinate.latitude), \(loc.coordinate.longitude)")
+            
+            isProgrammaticMove = true
+            shouldFollowUserLocation = false
+            
+            // Обновляем регион И ID карты с БОЛЬШИМ приближением
+            mapRegion = MKCoordinateRegion(
+                center: loc.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
+            )
+            mapRefreshID = UUID()
+            isProgrammaticMove = false
+            geocodeLocation(loc.coordinate)
+            checkDeliveryZone(coordinate: loc.coordinate)
         }
     }
     
@@ -624,11 +847,30 @@ struct AddNewAddressMapView: View {
                         .font(.title2)
                         .foregroundColor(.red)
                     
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(detectedAddress)
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .lineLimit(2)
+                        
+                        // Delivery status
+                        if isCheckingDelivery {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                Text("Проверяем зону...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else if !deliveryAvailable {
+                            Text("Доставка недоступна")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        } else if let time = deliveryTime {
+                            Text("Доставка ~ \(time) мин")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
                         
                         if isMapMoving {
                             Text("Отпустите для выбора")
@@ -638,11 +880,6 @@ struct AddNewAddressMapView: View {
                     }
                     
                     Spacer()
-                    
-                    if isMapMoving {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -652,15 +889,15 @@ struct AddNewAddressMapView: View {
                     selectedCoordinate = mapRegion.center
                     showAddressForm = true
                 } label: {
-                    Text("Подтвердить адрес")
+                    Text(deliveryAvailable ? "Подтвердить адрес" : "Доставка недоступна")
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(detectedAddress == "Определяем адрес..." ? Color.gray : Color.red)
+                        .background(deliveryAvailable && detectedAddress != "Определяем адрес..." ? Color.red : Color.gray)
                         .cornerRadius(14)
                 }
-                .disabled(detectedAddress == "Определяем адрес...")
+                .disabled(!deliveryAvailable || detectedAddress == "Определяем адрес...")
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
@@ -671,35 +908,123 @@ struct AddNewAddressMapView: View {
     }
     
     // MARK: - Helpers
-    // MARK: - Geocoding
+    // MARK: - Geocoding (Yandex Geocoder HTTP API)
     
     private func geocodeLocation(_ coordinate: CLLocationCoordinate2D) {
-        let geocoder = CLGeocoder()
-        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        // Получаем API ключ для Yandex Geocoder
+        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "YandexGeocoderApiKey") as? String, !apiKey.isEmpty else {
+            print("❌ YandexGeocoderApiKey not found")
+            DispatchQueue.main.async {
+                self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
+            }
+            return
+        }
         
-        geocoder.reverseGeocodeLocation(location) { placemarks, error in
-            if let placemark = placemarks?.first {
-                var addressComponents: [String] = []
-                
-                if let street = placemark.thoroughfare {
-                    addressComponents.append(street)
+        let urlString = "https://geocode-maps.yandex.ru/1.x/?apikey=\(apiKey)&geocode=\(coordinate.longitude),\(coordinate.latitude)&format=json&kind=house&results=1&lang=ru_RU"
+        
+        print("🔍 Yandex Geocoding: \(coordinate.latitude), \(coordinate.longitude)")
+        
+        guard let url = URL(string: urlString) else {
+            DispatchQueue.main.async {
+                self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
+            }
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let error = error {
+                print("❌ Geocoding error: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
                 }
-                if let building = placemark.subThoroughfare {
-                    addressComponents.append(building)
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
                 }
-                
-                if addressComponents.isEmpty {
-                    if let name = placemark.name {
-                        addressComponents.append(name)
+                return
+            }
+            
+            // Проверяем на ошибку API ключа
+            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errorMessage = errorJson["message"] as? String {
+                print("⚠️ API Response: \(errorMessage)")
+                if errorMessage.contains("Invalid api key") {
+                    print("❌ INVALID API KEY! Нужен ключ для HTTP Geocoder, не MapKit!")
+                }
+                DispatchQueue.main.async {
+                    self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
+                }
+                return
+            }
+            
+            do {
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let responseObj = json["response"] as? [String: Any],
+                      let geoObjectCollection = responseObj["GeoObjectCollection"] as? [String: Any],
+                      let featureMember = geoObjectCollection["featureMember"] as? [[String: Any]],
+                      !featureMember.isEmpty,
+                      let firstFeature = featureMember.first,
+                      let geoObject = firstFeature["GeoObject"] as? [String: Any] else {
+                    print("⚠️ Empty or invalid response structure")
+                    DispatchQueue.main.async {
+                        self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
                     }
+                    return
                 }
                 
-                DispatchQueue.main.async {
-                    detectedAddress = addressComponents.isEmpty ? "Адрес не определён" : addressComponents.joined(separator: ", ")
+                // Извлекаем адрес
+                if let metaDataProperty = geoObject["metaDataProperty"] as? [String: Any],
+                   let geocoderMetaData = metaDataProperty["GeocoderMetaData"] as? [String: Any],
+                   let addressText = geocoderMetaData["text"] as? String, !addressText.isEmpty {
+                    print("✅ Yandex Address: \(addressText)")
+                    DispatchQueue.main.async {
+                        self.detectedAddress = addressText
+                    }
+                    return
                 }
-            } else {
+                
+                // Fallback: coordinates
                 DispatchQueue.main.async {
-                    detectedAddress = "Адрес не определён"
+                    self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
+                }
+            } catch {
+                print("❌ Parse error: \(error)")
+                DispatchQueue.main.async {
+                    self.detectedAddress = String(format: "%.6f, %.6f", coordinate.latitude, coordinate.longitude)
+                }
+            }
+        }.resume()
+    }
+    
+    // MARK: - Delivery Zone Check
+    
+    private func checkDeliveryZone(coordinate: CLLocationCoordinate2D) {
+        isCheckingDelivery = true
+        deliveryAvailable = false // По умолчанию недоступна
+        deliveryTime = nil
+        
+        Task {
+            do {
+                let response = try await appState.catalogService.checkDelivery(
+                    lat: coordinate.latitude,
+                    lng: coordinate.longitude,
+                    city: "Москва"
+                )
+                
+                await MainActor.run {
+                    // Только координаты определяют доступность
+                    deliveryAvailable = response.available
+                    deliveryTime = response.available ? response.sla_minutes : nil
+                    isCheckingDelivery = false
+                }
+            } catch {
+                await MainActor.run {
+                    deliveryAvailable = false
+                    deliveryTime = nil
+                    isCheckingDelivery = false
                 }
             }
         }
@@ -738,34 +1063,25 @@ struct MapViewWithCenterTracking: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: MKMapView, context: Context) {
-        if isMoving { return } // user gesture in progress
+        // ✅ FIXED: Только программные изменения (кнопка "Найти меня", выбор города)
+        // НЕ синхронизируем во время или после user gesture
+        guard !context.coordinator.isUserInteraction else { return }
+
         let currentCenter = mapView.region.center
         let newCenter = region.center
         let distance = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
             .distance(from: CLLocation(latitude: newCenter.latitude, longitude: newCenter.longitude))
-        
-        if distance > 100 {
-            mapView.setRegion(region, animated: true)
-        }
-    }
-    
-    private func centerMap(on coordinate: CLLocationCoordinate2D) {
-        withAnimation {
-            mapRegion = MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
-        }
-    }
-    
-    private func centerToSelectedCityIfNeeded() {
-        let center = cityCenter(for: appState.selectedCity)
-        centerMap(on: center)
-    }
-    
-    private func cityCenter(for city: String) -> CLLocationCoordinate2D {
-        switch city {
-        case "Санкт-Петербург":
-            return CLLocationCoordinate2D(latitude: 59.9386, longitude: 30.3141)
-        default:
-            return CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173)
+
+        // Обновляем карту ТОЛЬКО при смене координат (больше 10м)
+        // Zoom пользователь может менять свободно
+        if distance > 10 {
+            context.coordinator.isProgrammaticChange = true
+            
+            // Применяем новый center, но сохраняем текущий zoom пользователя
+            var newRegion = region
+            newRegion.span = mapView.region.span // Сохраняем zoom пользователя
+            
+            mapView.setRegion(newRegion, animated: false)
         }
     }
     
@@ -777,11 +1093,20 @@ struct MapViewWithCenterTracking: UIViewRepresentable {
         var parent: MapViewWithCenterTracking
         private var debounceTimer: Timer?
         
+        // ✅ Флаг: различаем user gesture vs программное изменение
+        var isProgrammaticChange = false
+        var isUserInteraction = false
+        
         init(_ parent: MapViewWithCenterTracking) {
             self.parent = parent
         }
         
         func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
+            // Если НЕ программное изменение → это user gesture
+            if !isProgrammaticChange {
+                isUserInteraction = true
+            }
+            
             DispatchQueue.main.async {
                 self.parent.isMoving = true
             }
@@ -789,12 +1114,20 @@ struct MapViewWithCenterTracking: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            isProgrammaticChange = false // Сбрасываем флаг
+            
             debounceTimer?.invalidate()
             debounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                
                 DispatchQueue.main.async {
-                    self?.parent.isMoving = false
-                    self?.parent.region = mapView.region
-                    self?.parent.onRegionChanged(mapView.region)
+                    self.parent.isMoving = false
+                    // ✅ Обновляем SwiftUI state ТОЛЬКО после user gesture
+                    self.parent.region = mapView.region
+                    self.parent.onRegionChanged(mapView.region)
+                    
+                    // Разрешаем следующие user interactions
+                    self.isUserInteraction = false
                 }
             }
         }
@@ -811,14 +1144,19 @@ struct YandexMapWithCenterTracking: UIViewRepresentable {
     
     func makeUIView(context: Context) -> YMKMapView {
         let mapView: YMKMapView = YMKMapView(frame: .zero)
+        
+        // Конвертируем latitudeDelta в zoom level
+        // zoom ≈ log2(360 / latitudeDelta)
+        let zoom = Float(log2(360.0 / region.span.latitudeDelta))
+        
         let camera = YMKCameraPosition(
             target: YMKPoint(latitude: region.center.latitude, longitude: region.center.longitude),
-            zoom: 14,
+            zoom: zoom,
             azimuth: 0,
             tilt: 0
         )
         let anim = YMKAnimation(type: .smooth, duration: 0)
-        
+
         guard let mapWindow = mapView.mapWindow else { return mapView }
         let map = mapWindow.map
         map.move(with: camera, animation: anim, cameraCallback: nil)
@@ -827,20 +1165,28 @@ struct YandexMapWithCenterTracking: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: YMKMapView, context: Context) {
-        if isMoving { return } // skip while user drags
+        // ✅ FIXED: Только программные изменения (кнопка "Найти меня", выбор города)
+        guard !context.coordinator.isUserInteraction else { return }
+
         guard let mapWindow = mapView.mapWindow else { return }
         let map = mapWindow.map
         let current = map.cameraPosition.target
         let distance = CLLocation(latitude: current.latitude, longitude: current.longitude)
             .distance(from: CLLocation(latitude: region.center.latitude, longitude: region.center.longitude))
-        if distance > 100 {
+
+        // Обновляем ТОЛЬКО при смене координат (больше 10м)
+        // Zoom пользователь может менять свободно
+        if distance > 10 {
+            context.coordinator.isProgrammaticChange = true
+            
+            // Перемещаем камеру, но сохраняем текущий zoom пользователя
             let camera = YMKCameraPosition(
                 target: YMKPoint(latitude: region.center.latitude, longitude: region.center.longitude),
-                zoom: map.cameraPosition.zoom,
+                zoom: map.cameraPosition.zoom, // Сохраняем zoom пользователя
                 azimuth: map.cameraPosition.azimuth,
                 tilt: map.cameraPosition.tilt
             )
-            let anim = YMKAnimation(type: .smooth, duration: 0)
+            let anim = YMKAnimation(type: .linear, duration: 0) // БЕЗ анимации
             map.move(with: camera, animation: anim, cameraCallback: nil)
         }
     }
@@ -853,6 +1199,10 @@ struct YandexMapWithCenterTracking: UIViewRepresentable {
         var parent: YandexMapWithCenterTracking
         private var debounceTimer: Timer?
         
+        // ✅ Флаги для различения user gesture vs программного изменения
+        var isProgrammaticChange = false
+        var isUserInteraction = false
+        
         init(_ parent: YandexMapWithCenterTracking) {
             self.parent = parent
         }
@@ -863,13 +1213,23 @@ struct YandexMapWithCenterTracking: UIViewRepresentable {
             cameraUpdateReason: YMKCameraUpdateReason,
             finished: Bool
         ) {
+            // Определяем тип изменения
+            if cameraUpdateReason == .gestures {
+                isUserInteraction = true
+            }
+            
             DispatchQueue.main.async {
                 self.parent.isMoving = !finished
             }
             
+            // Обновляем SwiftUI state только после завершения движения
+            guard finished else { return }
+            
+            isProgrammaticChange = false // Сбрасываем флаг
+            
             debounceTimer?.invalidate()
             debounceTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { [weak self] _ in
-                guard let self else { return }
+                guard let self = self else { return }
                 let newRegion = MKCoordinateRegion(
                     center: CLLocationCoordinate2D(latitude: cameraPosition.target.latitude, longitude: cameraPosition.target.longitude),
                     span: self.parent.region.span
@@ -878,6 +1238,7 @@ struct YandexMapWithCenterTracking: UIViewRepresentable {
                     self.parent.region = newRegion
                     self.parent.onRegionChanged(newRegion)
                     self.parent.isMoving = false
+                    self.isUserInteraction = false // Разрешаем следующие interactions
                 }
             }
         }
@@ -1182,17 +1543,37 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func requestPermission() {
-        manager.requestWhenInUseAuthorization()
+        let status = manager.authorizationStatus
+        
+        if status == .notDetermined {
+            // Первый запрос разрешения
+            manager.requestWhenInUseAuthorization()
+        } else if status == .authorizedWhenInUse || status == .authorizedAlways {
+            // Разрешение уже есть - сразу запускаем
+            manager.startUpdatingLocation()
+        } else {
+            // Разрешение отклонено
+            print("⚠️ Location permission denied")
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        lastLocation = locations.last
+        guard let location = locations.last else { return }
+        print("📍 Location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        lastLocation = location
+        // Останавливаем обновления после получения первой точки
+        manager.stopUpdatingLocation()
     }
     
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
+        print("🔐 Authorization status changed: \(authorizationStatus.rawValue)")
+        
         if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
+            print("✅ Location authorized - starting updates")
             manager.startUpdatingLocation()
+        } else if authorizationStatus == .denied || authorizationStatus == .restricted {
+            print("❌ Location permission denied or restricted")
         }
     }
 }

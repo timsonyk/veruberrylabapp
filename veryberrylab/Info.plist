@@ -50,5 +50,9 @@
 	</dict>
 	<key>YMKApiKey</key>
 	<string>6a9aca5a-0a67-4fb3-a22a-fa87de83678c</string>
+	<key>YandexGeocoderApiKey</key>
+	<string>0bc9cff4-a606-4f34-9f70-7b7ba0501dae</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Нужен доступ к вашей геолокации, чтобы определить адрес доставки</string>
 </dict>
 </plist>

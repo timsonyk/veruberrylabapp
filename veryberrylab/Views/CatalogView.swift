@@ -13,81 +13,81 @@ struct CatalogView: View {
     var body: some View {
         NavigationView {
             ScrollViewReader { proxy in
-                ZStack(alignment: .bottom) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            // Delivery Header
-                            DeliveryHeaderSection(
-                                deliveryType: appState.deliveryType,
-                                address: appState.currentDeliveryAddress,
-                                onTap: { showAddressSelection = true }
-                            )
-                            
-                            // Auth Banner (for non-logged in users)
-                            if !appState.isLoggedIn {
-                                AuthBannerView(onTap: { showLogin = true })
-                            }
-                            
-                            // Promo Banners
-                            BannersSection(banners: catalogVM.banners)
-                            
-                            // Categories with anchor scrolling
-                            CategoriesSection(
-                                categories: sortedCategories,
-                                selected: catalogVM.selectedCategory,
-                                onSelect: { id in
-                                    catalogVM.selectCategory(id: id)
-                                    scrollToCategory(id, proxy: proxy)
+                GeometryReader { geo in
+                    ZStack(alignment: .bottom) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 16) {
+                                // Delivery Header
+                                DeliveryHeaderSection(
+                                    deliveryType: appState.deliveryType,
+                                    address: appState.currentDeliveryAddress,
+                                    onTap: { showAddressSelection = true }
+                                )
+                                
+                                // Auth Banner (for non-logged in users)
+                                if !appState.isLoggedIn {
+                                    AuthBannerView(onTap: { showLogin = true })
                                 }
-                            )
-                            
-                            LazyVStack(alignment: .leading, spacing: 24) {
-                                ForEach(categorySections()) { section in
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        Text(section.name)
-                                            .font(.title2)
-                                            .bold()
-                                            .padding(.horizontal, 4)
-                                        
-                                        if section.products.isEmpty {
-                                            Text("Нет товаров в этой категории")
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
+                                
+                                // Promo Banners
+                                BannersSection(banners: catalogVM.banners)
+                                
+                                // Categories with anchor scrolling
+                                CategoriesSection(
+                                    categories: sortedCategories,
+                                    selected: catalogVM.selectedCategory,
+                                    onSelect: { id in
+                                        catalogVM.selectCategory(id: id)
+                                        scrollToCategory(id, proxy: proxy)
+                                    }
+                                )
+                                
+                                LazyVStack(alignment: .leading, spacing: 24) {
+                                    ForEach(categorySections()) { section in
+                                        VStack(alignment: .leading, spacing: 12) {
+                                            Text(section.name)
+                                                .font(.title2)
+                                                .bold()
                                                 .padding(.horizontal, 4)
-                                        } else {
-                                            LazyVGrid(columns: gridColumns, spacing: cardSpacing) {
-                                                ForEach(section.products) { product in
-                                                    ProductCard(product: product) {
-                                                        cartVM.add(product: product, options: [])
+                                            
+                                            if section.products.isEmpty {
+                                                Text("Нет товаров в этой категории")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
+                                                    .padding(.horizontal, 4)
+                                            } else {
+                                                LazyVGrid(columns: gridColumns(for: geo.size.width), spacing: cardSpacing) {
+                                                    ForEach(section.products) { product in
+                                                        ProductCard(product: product)
                                                     }
                                                 }
                                             }
                                         }
+                                        .id(section.anchorId)
                                     }
-                                    .id(section.anchorId)
                                 }
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                            .padding(.bottom, cartVM.items.isEmpty ? 16 : 120)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, cartVM.items.isEmpty ? 16 : 120)
+                        
+                        // Persistent cart bar
+                        if !cartVM.items.isEmpty {
+                            FloatingCartButton(
+                                itemsCount: cartVM.itemsCount,
+                                total: cartVM.subtotal,
+                                onTap: { showCart = true }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                     }
-                    
-                    // Persistent cart bar
-                    if !cartVM.items.isEmpty {
-                        FloatingCartButton(
-                            itemsCount: cartVM.itemsCount,
-                            total: cartVM.subtotal,
-                            onTap: { showCart = true }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onChange(of: catalogVM.selectedCategory) { newValue in
+                        guard let newValue else { return }
+                        scrollToCategory(newValue, proxy: proxy)
                     }
-                }
-                .onChange(of: catalogVM.selectedCategory) { newValue in
-                    guard let newValue else { return }
-                    scrollToCategory(newValue, proxy: proxy)
                 }
             }
             .navigationBarHidden(true)
@@ -114,18 +114,14 @@ struct CatalogView: View {
         }
     }
     
-    private let cardSpacing: CGFloat = 16
+    private let cardSpacing: CGFloat = 10
     
-    private var cardWidth: CGFloat {
-        let horizontalPadding: CGFloat = 32 // matches outer horizontal padding
-        let availableWidth = UIScreen.main.bounds.width - horizontalPadding - cardSpacing
-        let targetWidth = floor(availableWidth / 2)
-        return min(targetWidth, 250) // keep width similar to design reference
-    }
-    
-    private var gridColumns: [GridItem] {
-        [
-            GridItem(.adaptive(minimum: cardWidth, maximum: cardWidth), spacing: cardSpacing)
+    private func gridColumns(for width: CGFloat) -> [GridItem] {
+        let outerHPad: CGFloat = 16
+        let cardWidth = floor((width - outerHPad * 2 - cardSpacing) / 2)
+        return [
+            GridItem(.fixed(cardWidth), spacing: cardSpacing),
+            GridItem(.fixed(cardWidth), spacing: cardSpacing)
         ]
     }
     
@@ -270,51 +266,24 @@ private struct FloatingCartButton: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Cart icon with badge
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "bag.fill")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                    
-                    Text("\(itemsCount)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.red)
-                        .padding(5)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .offset(x: 10, y: -10)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Корзина")
-                        .fontWeight(.semibold)
-                    Text("\(itemsCount) товаров")
-                        .font(.caption)
-                        .opacity(0.9)
-                }
+            HStack(spacing: 16) {
+                Text("Корзина")
+                    .font(.headline)
+                    .fontWeight(.semibold)
                 
                 Spacer()
                 
-                HStack(spacing: 6) {
-                    Text("\(Int(total)) ₽")
-                        .fontWeight(.bold)
-                    Image(systemName: "chevron.right")
-                        .font(.subheadline)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color.white.opacity(0.15))
-                .cornerRadius(12)
+                Text("\(Int(total)) ₽")
+                    .font(.title3)
+                    .fontWeight(.bold)
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
             .background(Color.red)
-            .cornerRadius(18)
-            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 6)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
         }
         .buttonStyle(.plain)
     }
@@ -333,6 +302,7 @@ private struct BannersSection: View {
                             .frame(width: 180, height: 200)
                     }
                 }
+                .padding(.leading, 12) // nudge banners slightly right
             }
         }
     }
@@ -445,8 +415,8 @@ private struct BannerCard: View {
 // MARK: - Product Card
 
 private struct ProductCard: View {
+    @EnvironmentObject var cartVM: CartViewModel
     let product: ProductDTO
-    var onAdd: () -> Void
     
     private var productImageURL: URL? {
         guard let urlString = product.media?.first,
@@ -462,9 +432,24 @@ private struct ProductCard: View {
         return url
     }
     
+    private var quantityInCart: Int {
+        cartVM.totalQuantity(forProductId: product.id ?? 0)
+    }
+    
+    // Get all cart items for this product (to decrement the first one)
+    private var firstCartItem: CartItem? {
+        cartVM.items.first { $0.productId == product.id ?? 0 }
+    }
+    
+    private var descriptionText: String? {
+        let text = (product.description ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+    
     var body: some View {
-        NavigationLink(destination: ProductDetailView(productId: product.id ?? 0)) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            // Product Image - tappable to open detail
+            NavigationLink(destination: ProductDetailView(productId: product.id ?? 0)) {
                 GeometryReader { geometry in
                     ZStack {
                         Rectangle()
@@ -503,18 +488,80 @@ private struct ProductCard: View {
                     .cornerRadius(14)
                 }
                 .aspectRatio(1, contentMode: .fit)
-                
+            }
+            .buttonStyle(.plain)
+            
+            // Product Name - tappable to open detail
+            NavigationLink(destination: ProductDetailView(productId: product.id ?? 0)) {
                 Text(product.name ?? "")
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
                     .lineLimit(2)
+            }
+            .buttonStyle(.plain)
 
+            if let description = descriptionText {
+                Text(description)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            // Control or Price Pill
+            if quantityInCart > 0 {
+                CatalogQuantityControl(
+                    quantity: quantityInCart,
+                    onDecrement: {
+                        if let item = firstCartItem {
+                            cartVM.decrement(item)
+                        }
+                    },
+                    onIncrement: {
+                        cartVM.add(product: product, options: [])
+                    }
+                )
+            } else {
                 PricePill(price: product.base_price ?? 0)
             }
-            .background(Color.white)
         }
-        .buttonStyle(.plain)
+        .background(Color.white)
+    }
+}
+
+private struct CatalogQuantityControl: View {
+    let quantity: Int
+    let onDecrement: () -> Void
+    let onIncrement: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onDecrement) {
+                Image(systemName: "minus")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .frame(width: 32, height: 32)
+            }
+            
+            Text("\(quantity)")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .frame(minWidth: 24)
+            
+            Button(action: onIncrement) {
+                Image(systemName: "plus")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .frame(width: 32, height: 32)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color(.systemGray6))
+        .clipShape(Capsule())
     }
 }
 

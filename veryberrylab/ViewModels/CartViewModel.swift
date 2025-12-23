@@ -72,6 +72,36 @@ final class CartViewModel: ObservableObject {
         items.removeAll { $0.id == item.id }
     }
     
+    // MARK: - Helper Methods for Product Quantity
+    
+    /// Returns the total quantity of a product in cart (across all option variations)
+    func totalQuantity(forProductId productId: Int) -> Int {
+        items.filter { $0.productId == productId }.reduce(0) { $0 + $1.quantity }
+    }
+    
+    /// Returns the cart item for specific product and options combination
+    func cartItem(forProductId productId: Int, options: [SelectedOption]) -> CartItem? {
+        items.first { $0.productId == productId && $0.selectedOptions == options }
+    }
+    
+    /// Increments quantity for specific product+options
+    func incrementProduct(_ productId: Int, options: [SelectedOption]) {
+        if let idx = items.firstIndex(where: { $0.productId == productId && $0.selectedOptions == options }) {
+            items[idx].quantity += 1
+        }
+    }
+    
+    /// Decrements quantity for specific product+options
+    func decrementProduct(_ productId: Int, options: [SelectedOption]) {
+        if let idx = items.firstIndex(where: { $0.productId == productId && $0.selectedOptions == options }) {
+            if items[idx].quantity > 1 {
+                items[idx].quantity -= 1
+            } else {
+                items.remove(at: idx)
+            }
+        }
+    }
+    
     func clearCart() {
         items.removeAll()
         appliedPromo = nil

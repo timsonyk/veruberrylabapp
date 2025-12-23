@@ -28,7 +28,7 @@ final class AppState: ObservableObject {
     @Published var bonusBalance: Int = 0
     
     private let authService = AuthService()
-    private let catalogService = CatalogService()
+    let catalogService = CatalogService()
     private let addressesKey = "savedAddresses_v2"
     
     var isLoggedIn: Bool {
@@ -200,19 +200,9 @@ final class AppState: ObservableObject {
         guard let data = UserDefaults.standard.data(forKey: addressesKey),
               let addresses = try? JSONDecoder().decode([DeliveryAddress].self, from: data),
               !addresses.isEmpty else {
-            // Добавим демо-адрес для начала
-            let demoAddress = DeliveryAddress(
-                street: "Пуговишников переулок, 7",
-                apartment: "15",
-                entrance: "1",
-                floor: "3",
-                latitude: 55.7330,
-                longitude: 37.5847,
-                isDefault: true,
-                isPrivateHouse: false
-            )
-            savedAddresses = [demoAddress]
-            selectedAddress = demoAddress
+            // Новый аккаунт - без адресов
+            savedAddresses = []
+            selectedAddress = nil
             return
         }
         savedAddresses = addresses

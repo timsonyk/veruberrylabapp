@@ -43,14 +43,35 @@ def check_delivery(payload: DeliveryCheckRequest, db: Session = Depends(get_db))
             zone_name=f"Зона {zone.id}"
         )
     else:
-        # Return default fee if no zone found
+        # No zone = unavailable
         return DeliveryCheckResponse(
-            available=True,
-            delivery_fee=700.0,
-            sla_minutes=180,
+            available=False,
+            delivery_fee=0.0,
+            sla_minutes=0,
             min_order_total=None,
             zone_name=None
         )
+
+
+class DeliveryZoneOut(BaseModel):
+    id: int
+    city: str
+    name: str
+    polygon: Optional[list] = None
+    delivery_fee: float
+    sla_minutes: int
+    min_order_total: Optional[float] = None
+    is_active: bool
+
+
+@router.get("/delivery-zones", response_model=list[DeliveryZoneOut])
+def list_delivery_zones(city: str = Query("Москва"), db: Session = Depends(get_db)):
+    """Get all active delivery zones for given city."""
+    zones = db.query(DeliveryZone).filter(
+        DeliveryZone.city == city,
+        DeliveryZone.is_active == True  # noqa: E712
+    ).order_by(DeliveryZone.sort_order).all()
+    return zones
 
 
 @router.get("/categories", response_model=list[CategoryOut])

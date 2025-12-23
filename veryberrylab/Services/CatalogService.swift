@@ -10,6 +10,19 @@ struct DeliveryCheckResponse: Codable {
     let zone_name: String?
 }
 
+// MARK: - Delivery Zone
+
+struct DeliveryZoneDTO: Codable, Identifiable {
+    let id: Int
+    let city: String
+    let name: String
+    let polygon: [[Double]]?
+    let delivery_fee: Double
+    let sla_minutes: Int
+    let min_order_total: Double?
+    let is_active: Bool
+}
+
 // MARK: - Catalog Service
 
 final class CatalogService {
@@ -39,6 +52,11 @@ final class CatalogService {
             "city": city
         ]
         return try await client.request(["catalog", "delivery-check"], method: "POST", body: body)
+    }
+    
+    func fetchDeliveryZones(city: String = "Москва") async throws -> [DeliveryZoneDTO] {
+        let query = [URLQueryItem(name: "city", value: city)]
+        return try await client.request(["catalog", "delivery-zones"], queryItems: query)
     }
 }
 

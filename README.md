@@ -48,3 +48,7 @@
 - Docker, Python 3.11+, Node 18+, Xcode 15+.
 - Переменные окружения (см. `backend/env.example`): Postgres, JWT секреты, CloudPayments (stub).
 
+open veryberrylab.xcworkspace
+
+cd /Users/timofey/Desktop/ПРОЕКТЫ/veryberrylab/backend && docker-compose build backend && 
+docker-compose up -d backend

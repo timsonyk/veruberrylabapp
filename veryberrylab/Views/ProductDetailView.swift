@@ -5,7 +5,17 @@ struct ProductDetailView: View {
     @EnvironmentObject var cartVM: CartViewModel
     @StateObject private var vm = ProductDetailViewModel()
     @State private var showFullDescription = false
+    @State private var showCart = false
     @Environment(\.dismiss) private var dismiss
+    
+    private var currentCartItem: CartItem? {
+        let opts = vm.selectionForCart()
+        return cartVM.cartItem(forProductId: productId, options: opts)
+    }
+    
+    private var quantityInCart: Int {
+        currentCartItem?.quantity ?? 0
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -49,18 +59,20 @@ struct ProductDetailView: View {
             // Bottom Bar
             if vm.product != nil {
                 BottomPriceBar(
-                    quantity: vm.quantity,
-                    totalPrice: vm.totalPrice,
-                    onDecrement: { vm.decrement() },
-                    onIncrement: { vm.increment() },
-                    onAddToCart: {
-                        for _ in 0..<vm.quantity {
-                            let opts = vm.selectionForCart()
-                            if let product = vm.product {
-                                cartVM.add(product: product, options: opts)
-                            }
+                    unitPrice: vm.unitPrice,
+                    quantityInCart: quantityInCart,
+                    onDecrement: {
+                        let opts = vm.selectionForCart()
+                        cartVM.decrementProduct(productId, options: opts)
+                    },
+                    onIncrement: {
+                        let opts = vm.selectionForCart()
+                        if let product = vm.product {
+                            cartVM.add(product: product, options: opts)
                         }
-                        dismiss()
+                    },
+                    onOpenCart: {
+                        showCart = true
                     }
                 )
             }
@@ -82,6 +94,9 @@ struct ProductDetailView: View {
         }
         .task {
             await vm.load(productId: productId)
+        }
+        .sheet(isPresented: $showCart) {
+            CartSheetView()
         }
     }
 }
@@ -400,49 +415,67 @@ private struct TextOptionRow: View {
 
 // MARK: - Bottom Price Bar
 private struct BottomPriceBar: View {
-    let quantity: Int
-    let totalPrice: Double
+    let unitPrice: Double
+    let quantityInCart: Int
     let onDecrement: () -> Void
     let onIncrement: () -> Void
-    let onAddToCart: () -> Void
+    let onOpenCart: () -> Void
     
     var body: some View {
         VStack(spacing: 0) {
             Divider()
             
             HStack(spacing: 12) {
-                // Quantity and Price controls
-                HStack(spacing: 0) {
-                    Button(action: onDecrement) {
-                        Image(systemName: "minus")
-                            .font(.title3.bold())
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                    }
-                    
-                    Text("\(quantity) × \(Int(totalPrice)) ₽")
-                        .font(.headline)
+                if quantityInCart == 0 {
+                    // Initial state: Red button with "PRICE ₽ +"
+                    Button(action: onIncrement) {
+                        HStack(spacing: 8) {
+                            Text("\(Int(unitPrice)) ₽")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                            Image(systemName: "plus")
+                                .font(.title3.bold())
+                        }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                    
-                    Button(action: onIncrement) {
-                        Image(systemName: "plus")
-                            .font(.title3.bold())
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                    }
-                }
-                .background(Color(red: 0.2, green: 0.7, blue: 0.5))
-                .cornerRadius(14)
-                
-                // Cart button
-                Button(action: onAddToCart) {
-                    Image(systemName: "bag.fill")
-                        .font(.title2)
-                        .foregroundColor(.primary)
-                        .frame(width: 50, height: 50)
-                        .background(Color.gray.opacity(0.15))
+                        .frame(height: 56)
+                        .background(Color.red)
                         .cornerRadius(14)
+                    }
+                } else {
+                    // In cart state: "− quantity × PRICE ₽ +" + cart icon
+                    HStack(spacing: 0) {
+                        Button(action: onDecrement) {
+                            Image(systemName: "minus")
+                                .font(.title3.bold())
+                                .foregroundColor(.white)
+                                .frame(width: 50, height: 56)
+                        }
+                        
+                        Text("\(quantityInCart) × \(Int(unitPrice)) ₽")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                        
+                        Button(action: onIncrement) {
+                            Image(systemName: "plus")
+                                .font(.title3.bold())
+                                .foregroundColor(.white)
+                                .frame(width: 50, height: 56)
+                        }
+                    }
+                    .background(Color.red)
+                    .cornerRadius(14)
+                    
+                    // Cart icon button
+                    Button(action: onOpenCart) {
+                        Image(systemName: "bag.fill")
+                            .font(.title2)
+                            .foregroundColor(.primary)
+                            .frame(width: 56, height: 56)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(14)
+                    }
                 }
             }
             .padding(.horizontal, 16)
