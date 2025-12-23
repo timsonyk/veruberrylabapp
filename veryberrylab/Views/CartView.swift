@@ -24,9 +24,9 @@ struct CartView: View {
             ZStack(alignment: .bottom) {
                 ScrollView {
                     VStack(spacing: 0) {
-                        if cartVM.items.isEmpty {
+                if cartVM.items.isEmpty {
                             emptyCartView
-                        } else {
+                } else {
                             // Delivery Type Picker
                             deliveryTypePicker
                                 .padding(.horizontal, 16)
@@ -57,8 +57,8 @@ struct CartView: View {
                             
                             // Do Not Call Toggle
                             doNotCallSection
-                                .padding(.horizontal, 16)
-                                .padding(.top, 8)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
                             
                             // Promo Code Section
                             promoCodeSection
@@ -67,7 +67,7 @@ struct CartView: View {
                             
                             // Summary Section
                             summarySection
-                                .padding(.horizontal, 16)
+                            .padding(.horizontal, 16)
                                 .padding(.top, 16)
                             
                             Spacer()
@@ -95,9 +95,9 @@ struct CartView: View {
                         }
                         .foregroundColor(.secondary)
                         .font(.subheadline)
-                    }
-                }
-            }
+        }
+    }
+}
         }
         .sheet(isPresented: $showAddressSelection) {
             AddressSelectionView()
@@ -494,7 +494,7 @@ private struct CartItemRowView: View {
         HStack(alignment: .top, spacing: 12) {
             // Product Image
             ZStack {
-                Rectangle()
+            Rectangle()
                     .fill(Color.gray.opacity(0.1))
                 
                 if let url = imageURL {
@@ -507,19 +507,19 @@ private struct CartItemRowView: View {
                                 .resizable()
                                 .scaledToFill()
                         case .failure:
-                            Image(systemName: "photo")
+                                Image(systemName: "photo")
                                 .foregroundColor(.gray)
                         @unknown default:
                             Color.gray.opacity(0.1)
                         }
                     }
                 } else {
-                    Image(systemName: "photo")
+                        Image(systemName: "photo")
                         .foregroundColor(.gray)
                 }
-            }
+                }
             .frame(width: 64, height: 64)
-            .clipped()
+                .clipped()
             .cornerRadius(10)
             
             // Product Info

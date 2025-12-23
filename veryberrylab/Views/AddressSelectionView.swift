@@ -38,17 +38,16 @@ struct AddressSelectionView: View {
         NavigationView {
             ZStack(alignment: .bottom) {
                 // Map (Yandex if available, otherwise Apple Maps)
-                CenterTrackingMapView(
-                    region: $mapRegion,
-                    isMoving: $isMapMoving,
-                    onRegionChanged: { region in
-                        // Игнорируем programmatic moves
-                        guard !isProgrammaticMove else { return }
-                        // Карта уже на нужной позиции после user gesture
-                    }
-                )
-                .id(mapRefreshID) // Обновляем карту при изменении ID
-                .ignoresSafeArea(edges: .top)
+            CenterTrackingMapView(
+                region: $mapRegion,
+                isMoving: $isMapMoving,
+                onRegionChanged: { region in
+                    // Разрешаем карте свободно двигаться
+                    // isProgrammaticMove больше не блокирует обновления
+                }
+            )
+            .id(mapRefreshID) // Обновляем карту при изменении ID
+            .ignoresSafeArea(edges: .top)
                 
                 // Bottom navigation buttons
                 bottomNavigationButtons
@@ -108,7 +107,6 @@ struct AddressSelectionView: View {
                 span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
             )
             shouldFollowUserLocation = false
-            isProgrammaticMove = false
         }
     }
     
@@ -368,7 +366,6 @@ struct AddressSelectionView: View {
             span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
         )
         mapRefreshID = UUID()
-        isProgrammaticMove = false
     }
     
     private func updateMapRegion() {
@@ -406,7 +403,6 @@ struct AddressSelectionView: View {
             span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
         )
         mapRefreshID = UUID()
-        isProgrammaticMove = false
     }
     
     private func selectCity(_ city: String) {
@@ -422,19 +418,22 @@ struct AddressSelectionView: View {
         
         isProgrammaticMove = true
         
+        // Увеличиваем начальный zoom для лучшей прогрузки карты
         mapRegion = MKCoordinateRegion(
             center: coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
         )
         mapRefreshID = UUID()
-        isProgrammaticMove = false
         
         // Если режим самовывоза, выбираем первый магазин в городе
         if appState.deliveryType == .pickup,
            let points = pickupPoints[city],
            let firstPoint = points.first {
             appState.selectedPickupPoint = firstPoint
-            moveMapToPickupPoint(firstPoint)
+            // Небольшая задержка для прогрузки карты перед zoom in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.moveMapToPickupPoint(firstPoint)
+            }
         }
     }
 }
@@ -658,10 +657,13 @@ struct AddNewAddressMapView: View {
                 region: $mapRegion,
                 isMoving: $isMapMoving,
                 onRegionChanged: { region in
-                    // Игнорируем programmatic moves
-                    guard !isProgrammaticMove else { return }
-                    geocodeLocation(region.center)
-                    checkDeliveryZone(coordinate: region.center)
+                    // Разрешаем карте свободно двигаться и обновлять адрес
+                    if !isProgrammaticMove {
+                        geocodeLocation(region.center)
+                        checkDeliveryZone(coordinate: region.center)
+                    }
+                    // Сбрасываем флаг сразу после первого callback
+                    isProgrammaticMove = false
                 }
             )
             .id(mapRefreshID) // Обновляем карту при изменении ID
@@ -750,7 +752,6 @@ struct AddNewAddressMapView: View {
                                 span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
                             )
                             mapRefreshID = UUID()
-                            isProgrammaticMove = false
                             geocodeLocation(location.coordinate)
                             checkDeliveryZone(coordinate: location.coordinate)
                         } else {
@@ -799,9 +800,10 @@ struct AddNewAddressMapView: View {
             ]
             
             if let coordinate = cityCoordinates[appState.selectedCity] {
+                // Устанавливаем хороший начальный zoom для прогрузки карты
                 mapRegion = MKCoordinateRegion(
                     center: coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
                 )
             }
             

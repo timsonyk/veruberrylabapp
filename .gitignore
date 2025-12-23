@@ -16,3 +16,11 @@ build/
 *.mp4
 *.mov
 *.z
+
+Pods/
+DerivedData/
+*.xcworkspace
+*.xcuserstate
+*.xcuserdata
+*.ipa
+*.dSYM
