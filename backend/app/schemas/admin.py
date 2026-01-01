@@ -207,3 +207,53 @@ class LoyaltySettingsUpdate(BaseModel):
     cashback_percent: float
 
 
+class CustomerOut(BaseModel):
+    id: int
+    phone: str
+    name: Optional[str] = None
+    telegram_id: Optional[int] = None
+    legacy_client_id: Optional[str] = None
+    first_order_date: Optional[datetime] = None
+    orders_count: int
+    orders_sum: float
+    points_available: float
+    points_spent: float
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class CustomerListResponse(BaseModel):
+    items: List[CustomerOut]
+    total: int
+
+
+class PointsAdjustmentRequest(BaseModel):
+    amount: float
+    type: str  # "add", "subtract", "set"
+    reason: Optional[str] = None
+
+
+class StoreLocationCreate(BaseModel):
+    city: str
+    address_text: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    phone: Optional[str] = None
+    working_hours: Optional[str] = None
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class StoreLocationUpdate(BaseModel):
+    city: Optional[str] = None
+    address_text: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    phone: Optional[str] = None
+    working_hours: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+

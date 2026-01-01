@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
 from app.models.loyalty import LoyaltyAccount, Referral
-from app.models.user import Address
-from app.schemas.user import AddressCreate, AddressOut, UserOut, UserUpdate
+from app.models.user import Address, User
+from app.schemas.user import AddressCreate, AddressOut, LoyaltyOut, UserOut, UserUpdate
 
 router = APIRouter(prefix="/me", tags=["profile"])
 
@@ -48,15 +48,27 @@ def delete_address(address_id: int, db: Session = Depends(get_db), user=Depends(
     return {"deleted": True}
 
 
-@router.get("/loyalty", response_model=dict)
+@router.get("/loyalty", response_model=LoyaltyOut)
 def get_loyalty(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # Get or create loyalty account
     account = db.query(LoyaltyAccount).filter(LoyaltyAccount.user_id == user.id).first()
     if not account:
         account = LoyaltyAccount(user_id=user.id)
         db.add(account)
         db.commit()
         db.refresh(account)
-    return {"balance": account.balance, "cashback_percent": account.cashback_percent}
+    
+    # Get user data with orders info
+    user_data = db.query(User).filter(User.id == user.id).first()
+    
+    return LoyaltyOut(
+        points_available=account.balance,
+        points_spent=account.points_spent,
+        cashback_percent=account.cashback_percent,
+        orders_count=user_data.orders_count,
+        orders_sum=float(user_data.orders_sum) if user_data.orders_sum else 0.0,
+        first_order_date=user_data.first_order_date,
+    )
 
 
 @router.get("/cards", response_model=dict)

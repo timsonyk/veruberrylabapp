@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, Float
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Float
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
@@ -17,15 +17,21 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     phone = Column(String(20), unique=True, nullable=False, index=True)
+    telegram_id = Column(BigInteger, unique=True, nullable=True, index=True)
+    legacy_client_id = Column(String(50), nullable=True, index=True)
     name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     city = Column(String(50), nullable=True)
     birthday = Column(Date, nullable=True)
+    first_order_date = Column(Date, nullable=True)
+    orders_count = Column(Integer, default=0, nullable=False)
+    orders_sum = Column(Numeric(12, 2), default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     loyalty_account = relationship("LoyaltyAccount", back_populates="user", uselist=False)
     addresses = relationship("Address", back_populates="user")
     orders = relationship("Order", back_populates="user")
+    loyalty_transactions = relationship("LoyaltyTransaction", back_populates="user")
 
 
 class AuthCode(Base):

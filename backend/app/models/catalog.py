@@ -190,3 +190,18 @@ class DeliveryZone(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class StoreLocation(Base):
+    """Store locations for display in app (addresses, contacts, etc.)"""
+    __tablename__ = "store_locations"
+
+    id = Column(Integer, primary_key=True)
+    city = Column(String(100), nullable=False)
+    address_text = Column(Text, nullable=False)
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
+    phone = Column(String(20), nullable=True)
+    working_hours = Column(String(255), nullable=True)
+    sort_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)

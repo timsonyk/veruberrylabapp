@@ -26,6 +26,20 @@ services:
       - ./app:/app/app
       - ./migrations:/app/migrations
       - ./uploads:/app/uploads
+      - ./scripts:/app/scripts
+
+  telegram-bot:
+    build: .
+    command: python telegram_bot.py
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - backend
+    volumes:
+      - ./telegram_bot.py:/app/telegram_bot.py
+      - ./app:/app/app
 
 volumes:
   db_data:

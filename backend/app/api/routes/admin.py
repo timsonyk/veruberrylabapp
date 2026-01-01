@@ -12,7 +12,7 @@ from app.core.config import get_settings
 from app.models import catalog as cat_models
 from app.models.order import Order, OrderStatus
 from app.models.user import User
-from app.models.loyalty import LoyaltyAccount
+from app.models.loyalty import LoyaltyAccount, LoyaltyTransaction, LoyaltyTransactionType
 from app.schemas import admin as admin_schemas
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -487,6 +487,43 @@ def delete_faq(faq_id: int, db: Session = Depends(get_db), user=Depends(get_admi
     return {"deleted": True}
 
 
+# -------- Store Locations --------
+@router.get("/store_locations")
+def list_store_locations_admin(db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    return db.query(cat_models.StoreLocation).order_by(cat_models.StoreLocation.sort_order).all()
+
+
+@router.post("/store_locations")
+def create_store_location(payload: admin_schemas.StoreLocationCreate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = cat_models.StoreLocation(**payload.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.put("/store_locations/{location_id}")
+def update_store_location(location_id: int, payload: admin_schemas.StoreLocationUpdate, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.StoreLocation).filter(cat_models.StoreLocation.id == location_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Store location not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@router.delete("/store_locations/{location_id}")
+def delete_store_location(location_id: int, db: Session = Depends(get_db), user=Depends(get_admin_user)):
+    obj = db.query(cat_models.StoreLocation).filter(cat_models.StoreLocation.id == location_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Store location not found")
+    db.delete(obj)
+    db.commit()
+    return {"deleted": True}
+
+
 @router.get("/app_texts")
 def list_app_texts(db: Session = Depends(get_db), user=Depends(get_admin_user)):
     return db.query(cat_models.AppText).all()
@@ -571,6 +608,138 @@ def update_order_status(order_id: int, status_value: str, db: Session = Depends(
 @router.get("/users")
 def list_users(limit: int = 100, db: Session = Depends(get_db), user=Depends(get_admin_user)):
     return db.query(User).order_by(User.created_at.desc()).limit(limit).all()
+
+
+# -------- Customers --------
+@router.get("/customers", response_model=admin_schemas.CustomerListResponse)
+def list_customers(
+    search: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    user=Depends(get_admin_user),
+):
+    """Get list of customers with loyalty info."""
+    q = db.query(
+        User.id,
+        User.phone,
+        User.name,
+        User.telegram_id,
+        User.legacy_client_id,
+        User.first_order_date,
+        User.orders_count,
+        User.orders_sum,
+        User.created_at,
+        LoyaltyAccount.balance.label('points_available'),
+        LoyaltyAccount.points_spent,
+    ).outerjoin(LoyaltyAccount, User.id == LoyaltyAccount.user_id)
+    
+    # Search filter
+    if search:
+        search_term = f"%{search}%"
+        q = q.filter(
+            (User.phone.ilike(search_term)) | 
+            (User.name.ilike(search_term)) |
+            (User.legacy_client_id.ilike(search_term))
+        )
+    
+    # Get total count
+    total = q.count()
+    
+    # Apply pagination
+    items = q.order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+    
+    # Convert to response format
+    customers = []
+    for item in items:
+        customers.append(admin_schemas.CustomerOut(
+            id=item.id,
+            phone=item.phone,
+            name=item.name,
+            telegram_id=item.telegram_id,
+            legacy_client_id=item.legacy_client_id,
+            first_order_date=item.first_order_date,
+            orders_count=item.orders_count,
+            orders_sum=float(item.orders_sum) if item.orders_sum else 0.0,
+            points_available=item.points_available if item.points_available is not None else 0.0,
+            points_spent=item.points_spent if item.points_spent is not None else 0.0,
+            created_at=item.created_at,
+        ))
+    
+    return admin_schemas.CustomerListResponse(items=customers, total=total)
+
+
+@router.post("/customers/{user_id}/points")
+def adjust_customer_points(
+    user_id: int,
+    payload: admin_schemas.PointsAdjustmentRequest,
+    db: Session = Depends(get_db),
+    admin_user=Depends(get_admin_user),
+):
+    """Adjust customer loyalty points."""
+    from datetime import datetime
+    
+    # Validate type
+    if payload.type not in ["add", "subtract", "set"]:
+        raise HTTPException(status_code=400, detail="Invalid adjustment type. Must be 'add', 'subtract', or 'set'")
+    
+    # Get user
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Get or create loyalty account
+    loyalty = db.query(LoyaltyAccount).filter(LoyaltyAccount.user_id == user_id).first()
+    if not loyalty:
+        loyalty = LoyaltyAccount(
+            user_id=user_id,
+            balance=0.0,
+            points_spent=0.0,
+            cashback_percent=5.0,
+        )
+        db.add(loyalty)
+        db.flush()
+    
+    old_balance = loyalty.balance
+    
+    # Calculate new balance
+    if payload.type == "add":
+        new_balance = old_balance + payload.amount
+        transaction_amount = payload.amount
+    elif payload.type == "subtract":
+        new_balance = old_balance - payload.amount
+        transaction_amount = -payload.amount
+    else:  # set
+        new_balance = payload.amount
+        transaction_amount = payload.amount - old_balance
+    
+    # Validate new balance
+    if new_balance < 0:
+        raise HTTPException(status_code=400, detail="Points balance cannot be negative")
+    
+    # Update balance
+    loyalty.balance = new_balance
+    loyalty.updated_at = datetime.utcnow()
+    
+    # Create transaction record
+    transaction = LoyaltyTransaction(
+        user_id=user_id,
+        amount=transaction_amount,
+        type=LoyaltyTransactionType.ADMIN_ADJUST,
+        description=payload.reason or f"Admin adjustment ({payload.type})",
+        admin_user=admin_user["username"],
+    )
+    db.add(transaction)
+    
+    db.commit()
+    db.refresh(loyalty)
+    
+    return {
+        "success": True,
+        "old_balance": old_balance,
+        "new_balance": loyalty.balance,
+        "adjustment": transaction_amount,
+    }
 
 
 # -------- Uploads --------

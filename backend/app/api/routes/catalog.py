@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_db
-from app.models.catalog import Banner, Category, Product, ModificationGroup, DeliveryZone
+from app.models.catalog import Banner, Category, Product, ModificationGroup, DeliveryZone, StoreLocation, FAQ
 from app.schemas.catalog import BannerOut, CategoryOut, ProductOut
 from app.services.pricing import _find_delivery_zone, _point_in_polygon
 
@@ -154,4 +154,16 @@ def list_banners(request: Request, db: Session = Depends(get_db)):
         dto = BannerOut(**{**dto.model_dump(), "image_url": normalize_image_url(dto.image_url)})
         out.append(dto)
     return out
+
+
+@router.get("/store_locations")
+def list_store_locations(db: Session = Depends(get_db)):
+    """Get list of store locations (public)."""
+    return db.query(StoreLocation).filter(StoreLocation.is_active == True).order_by(StoreLocation.sort_order).all()
+
+
+@router.get("/faqs")
+def list_faqs(db: Session = Depends(get_db)):
+    """Get list of FAQs (public)."""
+    return db.query(FAQ).filter(FAQ.is_active == True).order_by(FAQ.sort_order).all()
 

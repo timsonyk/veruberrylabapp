@@ -20,3 +20,10 @@ def downgrade() -> None:
     op.drop_column("delivery_zones", "polygon")
 
 
+
+
+
+
+
+
+

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     cloudpayments_api_key: str = Field("", alias="CLOUDPAYMENTS_API_KEY")
     cloudpayments_enabled: bool = Field(False, alias="CLOUDPAYMENTS_ENABLED")
 
+    telegram_bot_token: str = Field("", alias="TELEGRAM_BOT_TOKEN")
+    telegram_chat_id: str = Field("", alias="TELEGRAM_CHAT_ID")
+
     base_url: AnyUrl = Field("http://localhost:8000", alias="BASE_URL")
     upload_dir: str = Field("uploads", alias="UPLOAD_DIR")
 
@@ -30,11 +33,12 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         populate_by_name = True
+        extra = "ignore"
 
     @property
     def database_url(self) -> str:
         return (
-            f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.db_host}:{self.db_port}/{self.postgres_db}"
         )
 

@@ -24,3 +24,10 @@ def downgrade() -> None:
     op.add_column("delivery_zones", sa.Column("center_lng", sa.Float(), nullable=False, server_default="0"))
     op.add_column("delivery_zones", sa.Column("center_lat", sa.Float(), nullable=False, server_default="0"))
 
+
+
+
+
+
+
+

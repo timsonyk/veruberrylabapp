@@ -58,3 +58,15 @@ class AddressOut(AddressBase):
     class Config:
         from_attributes = True
 
+
+class LoyaltyOut(BaseModel):
+    points_available: float
+    points_spent: float
+    cashback_percent: float
+    orders_count: int
+    orders_sum: float
+    first_order_date: Optional[date] = None
+
+    class Config:
+        from_attributes = True
+
