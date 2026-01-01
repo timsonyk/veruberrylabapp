@@ -6,6 +6,7 @@ import {
   ShoppingCartOutlined,
   SettingOutlined,
   DeploymentUnitOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useLogout } from '../hooks/useAuth'
@@ -23,6 +24,11 @@ const menuItems = [
       { key: '/catalog/products', label: <Link to="/catalog/products">Товары</Link> },
       { key: '/catalog/modifications', label: <Link to="/catalog/modifications">Модификации</Link> },
     ],
+  },
+  {
+    key: '/customers',
+    icon: <UserOutlined />,
+    label: <Link to="/customers">Клиенты</Link>,
   },
   {
     key: '/orders',
@@ -54,6 +60,7 @@ const menuItems = [
     children: [
       { key: '/settings/texts', label: <Link to="/settings/texts">Тексты</Link> },
       { key: '/settings/loyalty', label: <Link to="/settings/loyalty">Лояльность</Link> },
+      { key: '/settings/store-locations', label: <Link to="/settings/store-locations">Адреса магазинов</Link> },
     ],
   },
 ]
