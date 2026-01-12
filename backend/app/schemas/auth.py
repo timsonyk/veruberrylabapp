@@ -43,3 +43,11 @@ class TelegramBotAuthStatus(BaseModel):
     expires_in: Optional[int] = None
     issued_at: Optional[datetime] = None
 
+
+class TelegramBotConfirmRequest(BaseModel):
+    """Request from Telegram bot to confirm auth."""
+    phone: str
+    telegram_id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+

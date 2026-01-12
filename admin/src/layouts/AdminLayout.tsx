@@ -1,4 +1,4 @@
-import { Layout, Menu, Typography } from 'antd'
+import { Layout, Menu, Typography, Button, Space, theme } from 'antd'
 import {
   AppstoreOutlined,
   ShopOutlined,
@@ -7,9 +7,13 @@ import {
   SettingOutlined,
   DeploymentUnitOutlined,
   UserOutlined,
+  BellOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useLogout } from '../hooks/useAuth'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { Header, Sider, Content } = Layout
 
@@ -42,6 +46,7 @@ const menuItems = [
     children: [
       { key: '/marketing/banners', label: <Link to="/marketing/banners">Баннеры</Link> },
       { key: '/marketing/promo-codes', label: <Link to="/marketing/promo-codes">Промокоды</Link> },
+      { key: '/marketing/notifications', icon: <BellOutlined />, label: <Link to="/marketing/notifications">Push-уведомления</Link> },
     ],
   },
   {
@@ -69,6 +74,8 @@ export const AdminLayout = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const logout = useLogout()
+  const { isDark, toggleTheme } = useTheme()
+  const { token } = theme.useToken()
 
   const onLogout = async () => {
     await logout.mutateAsync()
@@ -79,18 +86,23 @@ export const AdminLayout = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider theme="light">
+      <Sider theme={isDark ? 'dark' : 'light'} style={{ background: token.colorBgContainer }}>
         <div style={{ padding: 16 }}>
           <Typography.Title level={4} style={{ margin: 0 }}>
             VeryBerryLab
           </Typography.Title>
         </div>
-        <Menu mode="inline" selectedKeys={selectedKeys} items={menuItems} />
+        <Menu
+          mode="inline"
+          selectedKeys={selectedKeys}
+          items={menuItems}
+          style={{ background: 'transparent', borderInlineEnd: 'none' }}
+        />
       </Sider>
       <Layout>
         <Header
           style={{
-            background: '#fff',
+            background: token.colorBgContainer,
             padding: '0 16px',
             display: 'flex',
             alignItems: 'center',
@@ -98,7 +110,15 @@ export const AdminLayout = () => {
           }}
         >
           <Typography.Text>Админка</Typography.Text>
-          <Typography.Link onClick={onLogout}>Выйти</Typography.Link>
+          <Space>
+            <Button
+              type="text"
+              icon={isDark ? <SunOutlined /> : <MoonOutlined />}
+              onClick={toggleTheme}
+              title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+            />
+            <Typography.Link onClick={onLogout}>Выйти</Typography.Link>
+          </Space>
         </Header>
         <Content style={{ padding: 16 }}>
           <Outlet />

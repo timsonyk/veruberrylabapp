@@ -58,5 +58,9 @@ final class CatalogService {
         let query = [URLQueryItem(name: "city", value: city)]
         return try await client.request(["catalog", "delivery-zones"], queryItems: query)
     }
+
+    func fetchPickupLocations() async throws -> [PickupPoint] {
+        try await client.request(["catalog", "store_locations"])
+    }
 }
 

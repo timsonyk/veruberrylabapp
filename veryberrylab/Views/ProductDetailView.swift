@@ -123,29 +123,17 @@ private struct ProductImageSection: View {
     var body: some View {
         GeometryReader { geometry in
             if let url = productImageURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(ProgressView())
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.width)
-                            .clipped()
-                    case .failure:
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.gray)
-                            )
-                    @unknown default:
-                        Color.gray.opacity(0.1)
-                    }
+                CachedAsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.width)
+                        .clipped()
+                        .cornerRadius(16)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .overlay(ProgressView())
                 }
                 .frame(width: geometry.size.width, height: geometry.size.width)
             } else {
@@ -174,7 +162,7 @@ private struct DescriptionSection: View {
                     .font(.body)
                     .foregroundColor(.secondary)
                     .lineLimit(isExpanded ? nil : 2)
-                
+
                 if !isExpanded && text.count > 80 {
                     Button("больше") {
                         withAnimation {
@@ -182,7 +170,7 @@ private struct DescriptionSection: View {
                         }
                     }
                     .font(.body)
-                    .fontWeight(.semibold)
+                    .fontWeight(.medium)
                     .foregroundColor(.primary)
                 }
             }
@@ -205,8 +193,7 @@ private struct ModificationGroupSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(group.name ?? "")
                     .font(.title3)
-                    .fontWeight(.bold)
-                
+
                 if let minCount = group.min_count, minCount > 0 {
                     Text("Минимум: \(minCount)")
                         .font(.caption)
@@ -286,20 +273,12 @@ private struct ImageOptionCard: View {
                         .fill(Color.gray.opacity(0.08))
                     
                     if let url = optionImageURL {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            case .failure:
-                                Image(systemName: "photo")
-                                    .foregroundColor(.gray)
-                            @unknown default:
-                                Color.gray.opacity(0.1)
-                            }
+                        CachedAsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            ProgressView()
                         }
                         .frame(maxWidth: .infinity)
                         .aspectRatio(1, contentMode: .fill)
@@ -322,7 +301,7 @@ private struct ImageOptionCard: View {
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                
+
                 // Price
                 if let price = option.extra_price, price > 0 {
                     Text("+ \(Int(price)) ₽")
@@ -371,10 +350,12 @@ private struct TextOptionRow: View {
                 // Name and price
                 HStack(spacing: 4) {
                     Text(option.name ?? "")
+                        .font(.body)
                         .foregroundColor(.primary)
-                    
+
                     if let price = option.extra_price, price > 0 {
                         Text("+\(Int(price)) ₽")
+                            .font(.body)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -451,9 +432,10 @@ private struct BottomPriceBar: View {
                                 .foregroundColor(.white)
                                 .frame(width: 50, height: 56)
                         }
-                        
+
                         Text("\(quantityInCart) × \(Int(unitPrice)) ₽")
                             .font(.headline)
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                         

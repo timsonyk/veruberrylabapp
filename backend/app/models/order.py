@@ -43,7 +43,7 @@ class PaymentStatus(str, enum.Enum):
 
 
 class PaymentProvider(str, enum.Enum):
-    CLOUDPAYMENTS = "cloudpayments_stub"
+    STUB = "stub"  # TODO: Add VTB_BUSINESS when integrated
 
 
 class Order(Base):
@@ -104,7 +104,7 @@ class Payment(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, unique=True)
     provider = Column(
         Enum(PaymentProvider, values_callable=lambda obj: [e.value for e in PaymentProvider], validate_strings=True),
-        default=PaymentProvider.CLOUDPAYMENTS,
+        default=PaymentProvider.STUB,
         nullable=False,
     )
     status = Column(

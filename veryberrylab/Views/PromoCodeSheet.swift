@@ -80,22 +80,21 @@ struct PromoCodeSheet: View {
                     .foregroundColor(.green)
                 Text("Промокод применён")
                     .font(.subheadline)
-                    .fontWeight(.medium)
                     .foregroundColor(.green)
             }
-            
+
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(promo.code)
                         .font(.headline)
-                    
+
                     Text(promoDescription(promo))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Text("-\(Int(cartVM.promoDiscount)) ₽")
                     .font(.headline)
                     .foregroundColor(.green)

@@ -10,7 +10,7 @@ from app.core.security import create_access_token
 from app.models.user import User
 from app.schemas.auth import (
     TelegramAuthRequest, TokenResponse,
-    TelegramBotAuthRequest, TelegramBotAuthStatus
+    TelegramBotAuthRequest, TelegramBotAuthStatus, TelegramBotConfirmRequest
 )
 from app.schemas.user import UserOut
 from app.core.config import get_settings
@@ -63,6 +63,9 @@ def validate_telegram_auth(data: TelegramAuthRequest, bot_token: str) -> bool:
 # In production, use Redis or database
 _telegram_bot_auth: dict[str, dict] = {}
 
+# Store for confirmed auth from Telegram bot (phone -> auth_data)
+_confirmed_auth: dict[str, dict] = {}
+
 
 def normalize_phone(phone: str) -> str:
     """Normalize phone number to +7XXXXXXXXXX format."""
@@ -101,6 +104,53 @@ def init_telegram_bot_auth(payload: TelegramBotAuthRequest):
     }
 
 
+@router.post("/telegram-bot/confirm")
+def confirm_telegram_bot_auth(payload: TelegramBotConfirmRequest, db: Session = Depends(get_db)):
+    """
+    Called by Telegram bot when user shares their phone number.
+    Creates or updates user and stores auth confirmation.
+    """
+    import time
+
+    phone = normalize_phone(payload.phone)
+
+    # Find or create user
+    user = db.query(User).filter(User.phone == phone).first()
+
+    if not user:
+        # Create new user
+        name = f"{payload.first_name or ''} {payload.last_name or ''}".strip() or None
+        user = User(
+            phone=phone,
+            telegram_id=payload.telegram_id,
+            name=name,
+        )
+        db.add(user)
+    else:
+        # Update telegram_id if not set
+        if not user.telegram_id:
+            user.telegram_id = payload.telegram_id
+        # Update name if not set
+        if not user.name and (payload.first_name or payload.last_name):
+            user.name = f"{payload.first_name or ''} {payload.last_name or ''}".strip()
+
+    db.commit()
+    db.refresh(user)
+
+    # Create token
+    token = create_access_token(subject=user.phone)
+
+    # Store confirmed auth (expires in 10 minutes)
+    _confirmed_auth[phone] = {
+        "token": token,
+        "user": user,
+        "timestamp": time.time(),
+        "expires": time.time() + 600,
+    }
+
+    return {"status": "ok", "phone": phone}
+
+
 @router.post("/telegram-bot/check", response_model=TelegramBotAuthStatus)
 def check_telegram_bot_auth(payload: TelegramBotAuthRequest, db: Session = Depends(get_db)):
     """
@@ -109,46 +159,27 @@ def check_telegram_bot_auth(payload: TelegramBotAuthRequest, db: Session = Depen
     """
     import time
 
-    # Try to import from telegram_bot module
-    try:
-        import sys
-        import os
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-        from telegram_bot import get_auth_by_phone, completed_auth
-
-        phone = normalize_phone(payload.phone)
-        auth_data = get_auth_by_phone(phone)
-
-        if auth_data:
-            # Auth completed via Telegram bot
-            user = db.query(User).filter(User.phone == phone).first()
-            if user:
-                settings = get_settings()
-                return TelegramBotAuthStatus(
-                    status="completed",
-                    access_token=auth_data["token"],
-                    user=UserOut.model_validate(user),
-                    expires_in=settings.access_token_expire_minutes * 60,
-                    issued_at=datetime.now(timezone.utc)
-                )
-    except ImportError:
-        pass
-
-    # Check if user exists and has telegram_id (already verified via bot previously)
     phone = normalize_phone(payload.phone)
-    user = db.query(User).filter(User.phone == phone, User.telegram_id.isnot(None)).first()
 
-    if user:
-        # User exists and has telegram_id - they're verified
-        settings = get_settings()
-        token = create_access_token(subject=user.phone)
-        return TelegramBotAuthStatus(
-            status="completed",
-            access_token=token,
-            user=UserOut.model_validate(user),
-            expires_in=settings.access_token_expire_minutes * 60,
-            issued_at=datetime.now(timezone.utc)
-        )
+    # Check confirmed auth from Telegram bot
+    auth_data = _confirmed_auth.get(phone)
+    if auth_data:
+        # Check if not expired
+        if auth_data.get("expires", 0) > time.time():
+            settings = get_settings()
+            user = auth_data["user"]
+            # Remove from store after use
+            del _confirmed_auth[phone]
+            return TelegramBotAuthStatus(
+                status="completed",
+                access_token=auth_data["token"],
+                user=UserOut.model_validate(user),
+                expires_in=settings.access_token_expire_minutes * 60,
+                issued_at=datetime.now(timezone.utc)
+            )
+        else:
+            # Expired
+            del _confirmed_auth[phone]
 
     return TelegramBotAuthStatus(status="pending")
 

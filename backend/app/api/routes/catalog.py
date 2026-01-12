@@ -80,8 +80,39 @@ def list_categories(db: Session = Depends(get_db)):
     return categories
 
 
+def _normalize_url(url: str | None, base: str) -> str | None:
+    """Normalize localhost URLs to current host."""
+    if not url:
+        return None
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+
+    if not parsed.scheme and url.startswith("/"):
+        return f"{base}{url}"
+
+    if parsed.netloc in ("localhost", "localhost:8000", "127.0.0.1", "127.0.0.1:8000"):
+        return f"{base}{parsed.path}"
+
+    return url
+
+
+def _normalize_product_media(product: ProductOut, base: str) -> ProductOut:
+    """Normalize media URLs in product."""
+    data = product.model_dump()
+    if data.get("media"):
+        data["media"] = [_normalize_url(m, base) for m in data["media"]]
+    # Also normalize modification option images
+    for group in data.get("modification_groups", []):
+        for option in group.get("options", []):
+            option["image_url"] = _normalize_url(option.get("image_url"), base)
+    return ProductOut(**data)
+
+
 @router.get("/products", response_model=list[ProductOut])
 def list_products(
+    request: Request,
     category_id: int | None = Query(None),
     active_only: bool = True,
     db: Session = Depends(get_db),
@@ -95,11 +126,19 @@ def list_products(
     if active_only:
         query = query.filter(Product.is_active == True)  # noqa: E712
     products = query.order_by(Product.sort_order).all()
-    return products
+
+    # Normalize URLs
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host")
+    host = forwarded_host or request.headers.get("host") or request.url.netloc
+    scheme = forwarded_proto or request.url.scheme
+    base = f"{scheme}://{host}".rstrip("/")
+
+    return [_normalize_product_media(ProductOut.model_validate(p), base) for p in products]
 
 
 @router.get("/products/{product_id}", response_model=ProductOut)
-def get_product(product_id: int, db: Session = Depends(get_db)):
+def get_product(product_id: int, request: Request, db: Session = Depends(get_db)):
     product = (
         db.query(Product)
         .options(
@@ -111,7 +150,15 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
     )
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return product
+
+    # Normalize URLs
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host")
+    host = forwarded_host or request.headers.get("host") or request.url.netloc
+    scheme = forwarded_proto or request.url.scheme
+    base = f"{scheme}://{host}".rstrip("/")
+
+    return _normalize_product_media(ProductOut.model_validate(product), base)
 
 
 @router.get("/banners", response_model=list[BannerOut])

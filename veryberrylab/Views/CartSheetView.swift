@@ -494,20 +494,12 @@ private struct CartItemRow: View {
                     .fill(Color.gray.opacity(0.1))
                 
                 if let url = imageURL {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                            Image(systemName: "photo")
-                                .foregroundColor(.gray)
-                        @unknown default:
-                            Color.gray.opacity(0.1)
-                        }
+                    CachedAsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        ProgressView()
                     }
                 } else {
                     Image(systemName: "photo")

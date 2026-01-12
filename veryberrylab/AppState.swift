@@ -5,14 +5,32 @@ import SwiftUI
 final class AppState: ObservableObject {
     // MARK: - Auth
     @Published var token: String? {
-        didSet { APIClient.shared.setToken(token) }
+        didSet {
+            APIClient.shared.setToken(token)
+            // Сохраняем токен
+            if let token = token {
+                UserDefaults.standard.set(token, forKey: authTokenKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: authTokenKey)
+            }
+        }
     }
-    @Published var user: UserDTO?
-    
+    @Published var user: UserDTO? {
+        didSet {
+            // Сохраняем данные пользователя
+            if let user = user, let data = try? JSONEncoder().encode(user) {
+                UserDefaults.standard.set(data, forKey: authUserKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: authUserKey)
+            }
+        }
+    }
+
     // MARK: - Delivery
     @Published var deliveryType: DeliveryType = .delivery
     @Published var savedAddresses: [DeliveryAddress] = []
     @Published var selectedAddress: DeliveryAddress?
+    @Published var pickupLocations: [PickupPoint] = []
     @Published var selectedPickupPoint: PickupPoint?
     @Published var selectedTimeSlot: DeliveryTimeSlot = .asap
     @Published var selectedCity: String = "Москва"
@@ -26,10 +44,13 @@ final class AppState: ObservableObject {
     
     // MARK: - Bonus
     @Published var bonusBalance: Int = 0
+    @Published var loyaltyInfo: LoyaltyInfoDTO?
     
     private let authService = AuthService()
     let catalogService = CatalogService()
     private let addressesKey = "savedAddresses_v2"
+    private let authTokenKey = "auth_token"
+    private let authUserKey = "auth_user"
     
     var isLoggedIn: Bool {
         token != nil && user != nil
@@ -40,7 +61,7 @@ final class AppState: ObservableObject {
         case .delivery:
             return selectedAddress?.shortAddress ?? "Выберите адрес"
         case .pickup:
-            return selectedPickupPoint?.address ?? "Выберите пункт"
+            return selectedPickupPoint?.displayName ?? "Выберите пункт"
         }
     }
     
@@ -58,27 +79,67 @@ final class AppState: ObservableObject {
     }
     
     init() {
+        // Загружаем сохранённую сессию
+        loadSavedAuth()
         loadSavedAddresses()
+
+        // Load pickup locations
+        Task {
+            await loadPickupLocations()
+        }
         // Check delivery for initial address
         if let address = selectedAddress {
             Task {
                 await checkDeliveryForAddress(address)
             }
         }
+        // Обновляем данные лояльности если залогинены
+        if isLoggedIn {
+            Task {
+                await fetchLoyaltyInfo()
+            }
+        }
     }
     
     // MARK: - Auth Methods
-    
-    func login(phone: String, code: String) async throws {
-        let resp = try await authService.verify(phone: phone, code: code)
-        token = resp.access_token
-        user = resp.user
+
+    private func loadSavedAuth() {
+        // Загружаем токен
+        if let savedToken = UserDefaults.standard.string(forKey: authTokenKey) {
+            // Устанавливаем токен напрямую без вызова didSet (чтобы не перезаписывать)
+            _token = Published(initialValue: savedToken)
+            APIClient.shared.setToken(savedToken)
+        }
+
+        // Загружаем данные пользователя
+        if let userData = UserDefaults.standard.data(forKey: authUserKey),
+           let savedUser = try? JSONDecoder().decode(UserDTO.self, from: userData) {
+            _user = Published(initialValue: savedUser)
+        }
     }
-    
+
+    func setAuthData(token: String, user: UserDTO) async {
+        self.token = token
+        self.user = user
+        await fetchLoyaltyInfo()
+    }
+
     func logout() {
         token = nil
         user = nil
         bonusBalance = 0
+        loyaltyInfo = nil
+    }
+    
+    func fetchLoyaltyInfo() async {
+        guard isLoggedIn else { return }
+        do {
+            let info: LoyaltyInfoDTO = try await APIClient.shared.request(["me", "loyalty"])
+            loyaltyInfo = info
+            bonusBalance = Int(info.points_available)
+        } catch {
+            print("Failed to fetch loyalty info: \(error)")
+        }
     }
     
     // MARK: - Address Methods
@@ -192,6 +253,17 @@ final class AppState: ObservableObject {
     
     func selectTimeSlot(_ slot: DeliveryTimeSlot) {
         selectedTimeSlot = slot
+    }
+
+    // MARK: - Pickup Locations
+
+    func loadPickupLocations() async {
+        do {
+            let locations = try await catalogService.fetchPickupLocations()
+            pickupLocations = locations.filter { $0.isActive }.sorted { $0.sortOrder < $1.sortOrder }
+        } catch {
+            print("Failed to load pickup locations: \(error)")
+        }
     }
     
     // MARK: - Persistence

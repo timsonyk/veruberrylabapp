@@ -19,10 +19,6 @@ class Settings(BaseSettings):
     db_host: str = Field("localhost", alias="DB_HOST")
     db_port: int = Field(5432, alias="DB_PORT")
 
-    cloudpayments_public_id: str = Field("", alias="CLOUDPAYMENTS_PUBLIC_ID")
-    cloudpayments_api_key: str = Field("", alias="CLOUDPAYMENTS_API_KEY")
-    cloudpayments_enabled: bool = Field(False, alias="CLOUDPAYMENTS_ENABLED")
-
     telegram_bot_token: str = Field("", alias="TELEGRAM_BOT_TOKEN")
     telegram_chat_id: str = Field("", alias="TELEGRAM_CHAT_ID")
 

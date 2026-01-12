@@ -1,13 +1,21 @@
 import SwiftUI
+@preconcurrency import WebKit
 
 struct CartView: View {
     @EnvironmentObject var cartVM: CartViewModel
     @EnvironmentObject var appState: AppState
-    
+
     @State private var showAddressSelection = false
     @State private var showTimeSelection = false
     @State private var showPromoCode = false
     @State private var showCommentSheet = false
+    @State private var showPaymentWebView = false
+    @State private var paymentURL: URL?
+    @State private var isProcessingCheckout = false
+    @State private var checkoutError: String?
+    @State private var showCheckoutError = false
+
+    private let orderService = OrderService()
     
     // Computed delivery fee from AppState (based on selected address polygon)
     private var currentDeliveryFee: Double {
@@ -86,7 +94,6 @@ struct CartView: View {
                 ToolbarItem(placement: .principal) {
                     Text("Корзина")
                         .font(.title3)
-                        .bold()
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if !cartVM.items.isEmpty {
@@ -144,7 +151,6 @@ struct CartView: View {
                 } label: {
                     Text(type.title)
                         .font(.subheadline)
-                        .fontWeight(.medium)
                         .foregroundColor(appState.deliveryType == type ? .primary : .secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
@@ -178,9 +184,9 @@ struct CartView: View {
                 Text(appState.currentDeliveryAddress)
                     .font(.subheadline)
                     .foregroundColor(.primary)
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -212,9 +218,9 @@ struct CartView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -296,9 +302,9 @@ struct CartView: View {
                     .font(.subheadline)
                     .foregroundColor(cartVM.orderComment.isEmpty ? .primary : .secondary)
                     .lineLimit(1)
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -359,9 +365,9 @@ struct CartView: View {
                         .font(.subheadline)
                         .foregroundColor(.primary)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -384,7 +390,7 @@ struct CartView: View {
                 Text("\(Int(cartVM.subtotal)) ₽")
             }
             .font(.subheadline)
-            
+
             if cartVM.promoDiscount > 0 {
                 HStack {
                     Text("Скидка")
@@ -395,7 +401,7 @@ struct CartView: View {
                 }
                 .font(.subheadline)
             }
-            
+
             HStack {
                 Text("Доставка")
                     .foregroundColor(.primary)
@@ -408,7 +414,7 @@ struct CartView: View {
                 }
             }
             .font(.subheadline)
-            
+
             if appState.isLoggedIn {
                 HStack {
                     Text("Вернётся баллами")
@@ -416,7 +422,7 @@ struct CartView: View {
                     Spacer()
                     HStack(spacing: 4) {
                         Text("+\(cartVM.earnedBonuses)")
-                            .fontWeight(.semibold)
+                            .font(.subheadline)
                         Image(systemName: "dollarsign.circle.fill")
                             .foregroundColor(.yellow)
                     }
@@ -445,27 +451,107 @@ struct CartView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Text("\(Int(currentTotal)) ₽")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.title3)
                 }
                 
                 Spacer()
-                
+
                 Button {
-                    // TODO: Checkout
+                    Task {
+                        await processCheckout()
+                    }
                 } label: {
-                    Text("Оформить заказ")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 16)
-                        .background(Color.red)
-                        .cornerRadius(14)
+                    HStack(spacing: 8) {
+                        if isProcessingCheckout {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        }
+                        Text(isProcessingCheckout ? "Оформление..." : "Оформить заказ")
+                            .font(.headline)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 16)
+                    .background(Color.red)
+                    .cornerRadius(14)
                 }
+                .disabled(isProcessingCheckout)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Color(.systemBackground))
+        }
+        .sheet(isPresented: $showPaymentWebView) {
+            if let url = paymentURL {
+                PaymentWebView(url: url) {
+                    // Payment completed
+                    showPaymentWebView = false
+                    cartVM.clearCart()
+                    // TODO: Show success screen
+                }
+            }
+        }
+        .alert("Ошибка оформления", isPresented: $showCheckoutError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(checkoutError ?? "Не удалось оформить заказ")
+        }
+    }
+
+    // MARK: - Checkout Logic
+
+    private func processCheckout() async {
+        isProcessingCheckout = true
+        defer { isProcessingCheckout = false }
+
+        do {
+            // Prepare order items
+            let items = cartVM.items.map { item in
+                // Convert selected options to JSON string
+                let modificationsJSON: String? = {
+                    guard !item.selectedOptions.isEmpty else { return nil }
+                    let mods = item.selectedOptions.map { ["id": $0.id, "name": $0.name] }
+                    guard let data = try? JSONSerialization.data(withJSONObject: mods),
+                          let json = String(data: data, encoding: .utf8) else { return nil }
+                    return json
+                }()
+
+                return OrderItemRequest(
+                    product_id: item.productId,
+                    quantity: item.quantity,
+                    size_id: nil,
+                    modifications_json: modificationsJSON
+                )
+            }
+
+            // Prepare order request
+            let request = CreateOrderRequest(
+                items: items,
+                delivery_type: appState.deliveryType.rawValue,
+                address_text: appState.deliveryType == .delivery ? appState.selectedAddress?.fullAddress : nil,
+                lat: appState.deliveryType == .delivery ? appState.selectedAddress?.latitude : appState.selectedPickupPoint?.latitude,
+                lng: appState.deliveryType == .delivery ? appState.selectedAddress?.longitude : appState.selectedPickupPoint?.longitude,
+                city: appState.selectedCity,
+                pickup_location_id: appState.deliveryType == .pickup ? appState.selectedPickupPoint?.id : nil,
+                comment: cartVM.orderComment.isEmpty ? nil : cartVM.orderComment,
+                no_call: cartVM.doNotCall,
+                promo_code: cartVM.promoCode.isEmpty ? nil : cartVM.promoCode
+            )
+
+            // Create order
+            let _ = try await orderService.createOrder(request)
+
+            // TODO: Add VTB Business payment integration
+            await MainActor.run {
+                cartVM.clearCart()
+                // TODO: Show success screen / payment screen
+            }
+
+        } catch {
+            await MainActor.run {
+                checkoutError = "Ошибка при оформлении заказа: \(error.localizedDescription)"
+                showCheckoutError = true
+            }
         }
     }
 }
@@ -498,20 +584,12 @@ private struct CartItemRowView: View {
                     .fill(Color.gray.opacity(0.1))
                 
                 if let url = imageURL {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                                Image(systemName: "photo")
-                                .foregroundColor(.gray)
-                        @unknown default:
-                            Color.gray.opacity(0.1)
-                        }
+                    CachedAsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        ProgressView()
                     }
                 } else {
                         Image(systemName: "photo")
@@ -526,18 +604,17 @@ private struct CartItemRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(.subheadline)
-                    .fontWeight(.medium)
                     .lineLimit(2)
-                
+
                 if !item.selectedOptions.isEmpty {
                     Text(item.selectedOptions.map { $0.name }.joined(separator: ", "))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Text("\(Int(item.totalPrice)) ₽")
                     .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
             }
             
             Spacer()
@@ -558,7 +635,6 @@ private struct CartItemRowView: View {
                 
                 Text("\(item.quantity)")
                     .font(.subheadline)
-                    .fontWeight(.medium)
                     .frame(width: 32)
                 
                 Button {
@@ -589,9 +665,8 @@ private struct RecommendationCardView: View {
             
             Text("Very Berry M")
                 .font(.caption)
-                .fontWeight(.medium)
                 .lineLimit(2)
-            
+
             Text("от 5090 ₽")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -601,5 +676,77 @@ private struct RecommendationCardView: View {
         .background(Color.white)
         .cornerRadius(14)
         .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+
+// MARK: - Payment WebView
+
+
+struct PaymentWebView: View {
+    let url: URL
+    let onComplete: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            WebView(url: url, onComplete: onComplete)
+                .navigationTitle("Оплата")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Отменить") {
+                            dismiss()
+                        }
+                    }
+                }
+        }
+    }
+}
+
+struct WebView: UIViewRepresentable {
+    let url: URL
+    let onComplete: () -> Void
+
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        let request = URLRequest(url: url)
+        webView.load(request)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onComplete: onComplete)
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        let onComplete: () -> Void
+
+        init(onComplete: @escaping () -> Void) {
+            self.onComplete = onComplete
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // Check if payment is complete by looking at URL
+            if let url = navigationAction.request.url {
+                let urlString = url.absoluteString
+
+                // Payment success redirect
+                if urlString.contains("success") || urlString.contains("completed") {
+                    DispatchQueue.main.async {
+                        self.onComplete()
+                    }
+                    decisionHandler(.cancel)
+                    return
+                }
+            }
+
+            decisionHandler(.allow)
+        }
     }
 }

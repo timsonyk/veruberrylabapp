@@ -11,6 +11,7 @@ import sys
 import hashlib
 import time
 import logging
+import httpx
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,9 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Bot token from environment
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "REDACTED")
-
-# Store completed auth: {phone: {telegram_id, timestamp, first_name, last_name}}
-completed_auth: dict[str, dict] = {}
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
 
 
 def normalize_phone(phone: str) -> str:
@@ -85,16 +84,25 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     logger.info(f"Phone verification: {phone} from Telegram user {telegram_id}")
 
-    # Store completed auth (expires in 10 minutes)
-    completed_auth[phone] = {
-        "telegram_id": telegram_id,
-        "first_name": first_name,
-        "last_name": last_name,
-        "timestamp": time.time(),
-        "expires": time.time() + 600,
-    }
-
-    logger.info(f"Auth stored for phone: {phone}")
+    # Notify backend about completed auth
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{BACKEND_URL}/auth/telegram-bot/confirm",
+                json={
+                    "phone": phone,
+                    "telegram_id": telegram_id,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                },
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                logger.info(f"Auth confirmed for phone: {phone}")
+            else:
+                logger.error(f"Failed to confirm auth: {response.status_code} {response.text}")
+    except Exception as e:
+        logger.error(f"Error notifying backend: {e}")
 
     await update.message.reply_text(
         "Отлично! Вы успешно авторизованы. ✅\n\n"
@@ -112,21 +120,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/help - Показать справку\n\n"
         "Для авторизации нажмите кнопку 'Поделиться номером телефона'."
     )
-
-
-def cleanup_expired():
-    """Remove expired auth entries."""
-    current = time.time()
-    expired = [k for k, v in completed_auth.items() if v.get("expires", 0) < current]
-    for k in expired:
-        del completed_auth[k]
-
-
-def get_auth_by_phone(phone: str) -> dict | None:
-    """Get completed auth by phone number."""
-    cleanup_expired()
-    normalized = normalize_phone(phone)
-    return completed_auth.get(normalized)
 
 
 def main():

@@ -73,7 +73,6 @@ struct DeliveryTimeSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Как можно скорее")
                         .font(.subheadline)
-                        .fontWeight(.medium)
                         .foregroundColor(.primary)
                     Text("В течение 180 мин")
                         .font(.caption)
@@ -238,7 +237,6 @@ private struct DateButton: View {
                     .foregroundColor(isSelected ? .white : .secondary)
                 Text(dateText)
                     .font(.title3)
-                    .fontWeight(.semibold)
                     .foregroundColor(isSelected ? .white : .primary)
             }
             .frame(width: 70, height: 70)
@@ -263,9 +261,9 @@ private struct TimeRangeButton: View {
                 Text(range.displayText)
                     .font(.subheadline)
                     .foregroundColor(isAvailable ? .primary : .secondary)
-                
+
                 Spacer()
-                
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.red)

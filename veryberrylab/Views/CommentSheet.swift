@@ -70,7 +70,7 @@ struct CommentSheet: View {
             Text("Быстрые комментарии")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            
+
             FlowLayout(spacing: 8) {
                 ForEach(quickComments, id: \.self) { quickComment in
                     Button {

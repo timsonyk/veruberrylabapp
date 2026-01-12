@@ -99,15 +99,22 @@ struct DeliveryAddress: Identifiable, Codable, Hashable {
 
 struct PickupPoint: Identifiable, Codable, Hashable {
     let id: Int
-    let name: String
+    let city: String
     let address: String
-    let latitude: Double
-    let longitude: Double
+    let latitude: Double?
+    let longitude: Double?
+    let phone: String?
     let workingHours: String?
+    let isActive: Bool
+    let sortOrder: Int
+
+    var displayName: String {
+        "\(city): \(address)"
+    }
     
     enum CodingKeys: String, CodingKey {
-        case id, name, address, latitude, longitude
-        case workingHours = "working_hours"
+        case id, city, address = "address_text", latitude = "lat", longitude = "lng"
+        case phone, workingHours = "working_hours", isActive = "is_active", sortOrder = "sort_order"
     }
 }
 

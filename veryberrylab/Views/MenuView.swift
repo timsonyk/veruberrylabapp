@@ -4,15 +4,16 @@ struct MenuView: View {
     var body: some View {
         NavigationView {
             List {
-                Section("FAQ") {
-                    Text("Частые вопросы (заглушка)")
+                Section("Помощь") {
+                    NavigationLink("Частые вопросы") {
+                        FAQView()
                 }
-                Section("Адрес") {
-                    Text("Средняя Переславская 25с1")
                 }
-                Section {
-                    Text("О приложении")
-                    Text("Работает на Стартере")
+                
+                Section("Контакты") {
+                    NavigationLink("Наши адреса") {
+                        StoreLocationsView()
+                    }
                 }
             }
             .navigationTitle("Меню")

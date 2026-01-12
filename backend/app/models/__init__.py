@@ -16,6 +16,13 @@ from app.models.catalog import (
     FAQ,
     AppText,
 )
+from app.models.notification import (
+    DeviceToken,
+    DevicePlatform,
+    Notification,
+    NotificationType,
+    PushCampaign,
+)
 
 __all__ = [
     "User",
@@ -39,4 +46,9 @@ __all__ = [
     "DeliveryZone",
     "FAQ",
     "AppText",
+    "DeviceToken",
+    "DevicePlatform",
+    "Notification",
+    "NotificationType",
+    "PushCampaign",
 ]

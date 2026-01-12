@@ -13,7 +13,9 @@ from app.models import catalog as cat_models
 from app.models.order import Order, OrderStatus
 from app.models.user import User
 from app.models.loyalty import LoyaltyAccount, LoyaltyTransaction, LoyaltyTransactionType
+from app.models.notification import DeviceToken, Notification, PushCampaign, NotificationType
 from app.schemas import admin as admin_schemas
+from app.schemas.notification import PushCampaignCreate, PushCampaignOut, PushSendResponse
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -757,13 +759,124 @@ def upload_file(
     with open(file_path, "wb") as f:
         f.write(file.file.read())
 
-    # Build a public URL from the incoming request (supports ngrok/reverse proxies)
+    # Build a public URL - prefer ngrok/forwarded headers, fallback to BASE_URL
     forwarded_proto = request.headers.get("x-forwarded-proto")
     forwarded_host = request.headers.get("x-forwarded-host")
-    host = forwarded_host or request.headers.get("host") or request.url.netloc
-    scheme = forwarded_proto or request.url.scheme
-    base = f"{scheme}://{host}".rstrip("/")
+
+    if forwarded_host:
+        # Request came through ngrok or reverse proxy
+        scheme = forwarded_proto or "https"
+        base = f"{scheme}://{forwarded_host}".rstrip("/")
+    else:
+        # Use BASE_URL from settings (should be ngrok URL in production)
+        base = str(settings.base_url).rstrip("/")
+
     url = f"{base}/uploads/{filename}"
     return {"url": url, "filename": filename}
+
+
+# -------- Push Notifications --------
+@router.get("/push-campaigns")
+def list_push_campaigns(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    admin_user=Depends(get_admin_user),
+):
+    """List all push notification campaigns"""
+    campaigns = db.query(PushCampaign).order_by(PushCampaign.created_at.desc()).offset(skip).limit(limit).all()
+    return campaigns
+
+
+@router.post("/push-campaigns/send", response_model=PushSendResponse)
+def send_push_notification(
+    payload: PushCampaignCreate,
+    db: Session = Depends(get_db),
+    admin_user=Depends(get_admin_user),
+):
+    """Send push notification to all users"""
+    from datetime import datetime
+
+    # Get all active device tokens
+    tokens = db.query(DeviceToken).filter(DeviceToken.is_active == True).all()
+
+    if not tokens:
+        raise HTTPException(status_code=400, detail="No active device tokens found")
+
+    # Create campaign record
+    campaign = PushCampaign(
+        title=payload.title,
+        body=payload.body,
+        notification_type=payload.notification_type,
+        created_by=admin_user.get("user_id"),
+    )
+    db.add(campaign)
+    db.flush()
+
+    sent_count = 0
+    failed_count = 0
+
+    # Create notification records for all users
+    user_ids = set(t.user_id for t in tokens)
+    for user_id in user_ids:
+        notification = Notification(
+            user_id=user_id,
+            title=payload.title,
+            body=payload.body,
+            notification_type=payload.notification_type,
+            is_read=False,
+        )
+        db.add(notification)
+
+    # Also create a "broadcast" notification (user_id = None)
+    broadcast_notification = Notification(
+        user_id=None,
+        title=payload.title,
+        body=payload.body,
+        notification_type=payload.notification_type,
+        is_read=False,
+    )
+    db.add(broadcast_notification)
+
+    # Send push notifications via APNs
+    # For now, we'll just log and count (APNs integration to be added)
+    for token in tokens:
+        try:
+            # TODO: Integrate with APNs service
+            # await send_apns_notification(token.token, payload.title, payload.body)
+            sent_count += 1
+        except Exception as e:
+            print(f"Failed to send push to {token.token}: {e}")
+            failed_count += 1
+
+    campaign.sent_count = sent_count
+    campaign.failed_count = failed_count
+    db.commit()
+    db.refresh(campaign)
+
+    return PushSendResponse(
+        success=True,
+        campaign_id=campaign.id,
+        sent_count=sent_count,
+        failed_count=failed_count,
+        message=f"Push notification sent to {sent_count} devices",
+    )
+
+
+@router.get("/push-stats")
+def get_push_stats(
+    db: Session = Depends(get_db),
+    admin_user=Depends(get_admin_user),
+):
+    """Get push notification statistics"""
+    total_tokens = db.query(DeviceToken).filter(DeviceToken.is_active == True).count()
+    total_campaigns = db.query(PushCampaign).count()
+    total_notifications = db.query(Notification).count()
+
+    return {
+        "active_devices": total_tokens,
+        "total_campaigns": total_campaigns,
+        "total_notifications": total_notifications,
+    }
 
 

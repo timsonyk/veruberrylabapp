@@ -76,3 +76,71 @@ struct UserDTO: Codable, Identifiable {
     let created_at: String
 }
 
+struct LoyaltyInfoDTO: Codable {
+    let points_available: Double
+    let points_spent: Double
+    let cashback_percent: Double
+    let orders_count: Int
+    let orders_sum: Double
+    let first_order_date: String?
+}
+
+struct OrderDTO: Codable, Identifiable {
+    let id: Int
+    let user_id: Int
+    let status: String
+    let delivery_type: String
+    let address_text: String?
+    let lat: Double?
+    let lng: Double?
+    let city: String?
+    let pickup_location_id: Int?
+    let comment: String?
+    let subtotal: Double
+    let delivery_fee: Double
+    let discount: Double
+    let total: Double
+    let loyalty_earned: Double
+    let created_at: String
+    let items: [OrderItemDTO]?
+}
+
+struct OrderItemDTO: Codable, Identifiable {
+    let id: Int
+    let order_id: Int
+    let product_id: Int
+    let product_name: String?
+    let quantity: Int
+    let base_price: Double
+    let final_price: Double
+    let total_price: Double
+    let modifications_json: String?
+}
+
+// MARK: - Notification DTOs
+
+enum NotificationType: String, Codable {
+    case promo = "promo"
+    case order = "order"
+    case system = "system"
+    case bonus = "bonus"
+}
+
+struct NotificationDTO: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let body: String
+    let notification_type: NotificationType
+    let is_read: Bool
+    let created_at: String
+}
+
+struct UnreadCountResponse: Codable {
+    let count: Int
+}
+
+struct DeviceTokenRequest: Codable {
+    let token: String
+    let platform: String
+}
+

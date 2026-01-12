@@ -10,6 +10,7 @@ import { OrdersPage } from './pages/orders/OrdersPage'
 import { OrderDetailPage } from './pages/orders/OrderDetailPage'
 import { BannersPage } from './pages/marketing/BannersPage'
 import { PromoCodesPage } from './pages/marketing/PromoCodesPage'
+import { NotificationsPage } from './pages/notifications/NotificationsPage'
 import { PickupsPage } from './pages/delivery/PickupsPage'
 import { ZonesPage } from './pages/delivery/ZonesPage'
 import { TextsPage } from './pages/settings/TextsPage'
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       { path: 'orders/:id', element: <OrderDetailPage /> },
       { path: 'marketing/banners', element: <BannersPage /> },
       { path: 'marketing/promo-codes', element: <PromoCodesPage /> },
+      { path: 'marketing/notifications', element: <NotificationsPage /> },
       { path: 'delivery/pickups', element: <PickupsPage /> },
       { path: 'delivery/zones', element: <ZonesPage /> },
       { path: 'settings/texts', element: <TextsPage /> },

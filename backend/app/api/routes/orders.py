@@ -1,9 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import logging
-import hmac
-import hashlib
-import base64
 
 from app.api.deps import get_current_user, get_db
 from app.models.order import DeliveryType, Order, OrderItem, OrderStatus, PaymentStatus
@@ -18,7 +15,6 @@ from app.services.pricing import calculate_totals
 from app.services import payments as payments_service
 from app.services import loyalty as loyalty_service
 from app.services.telegram_notifications import send_new_order_notification_sync
-from app.core.config import get_settings
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 logger = logging.getLogger(__name__)
@@ -157,107 +153,3 @@ def mark_paid(order_id: int, db: Session = Depends(get_db)):
 
     db.refresh(order)
     return order
-
-
-@router.post("/cloudpayments/webhook")
-async def cloudpayments_webhook(request: Request, db: Session = Depends(get_db)):
-    """
-    CloudPayments webhook for payment notifications.
-    Handles: pay (successful payment), fail (failed payment), refund, etc.
-    """
-    try:
-        # Получаем тело запроса
-        body = await request.body()
-        data = await request.json()
-
-        logger.info(f"CloudPayments webhook received: {data.get('TransactionId', 'unknown')}")
-
-        # Проверяем HMAC подпись (опционально, но рекомендуется)
-        settings = get_settings()
-        if settings.cloudpayments_api_key:
-            # CloudPayments отправляет HMAC в заголовке Content-HMAC
-            content_hmac = request.headers.get("Content-HMAC", "")
-            if content_hmac:
-                # Вычисляем HMAC
-                expected_hmac = base64.b64encode(
-                    hmac.new(
-                        settings.cloudpayments_api_key.encode('utf-8'),
-                        body,
-                        hashlib.sha256
-                    ).digest()
-                ).decode('utf-8')
-
-                if content_hmac != expected_hmac:
-                    logger.warning("CloudPayments HMAC verification failed")
-                    return {"code": 13, "message": "Invalid HMAC"}
-
-        # Извлекаем данные
-        invoice_id = data.get("InvoiceId", "")  # "order_123"
-        transaction_id = data.get("TransactionId")
-        status = data.get("Status")  # "Completed", "Declined", "Refunded"
-        amount = data.get("Amount")
-
-        # Парсим order_id из InvoiceId
-        if not invoice_id.startswith("order_"):
-            logger.error(f"Invalid InvoiceId format: {invoice_id}")
-            return {"code": 0}  # Возвращаем успех чтобы CloudPayments не повторял запросы
-
-        try:
-            order_id = int(invoice_id.split("_")[1])
-        except (IndexError, ValueError):
-            logger.error(f"Failed to parse order_id from InvoiceId: {invoice_id}")
-            return {"code": 0}
-
-        # Находим заказ
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if not order:
-            logger.error(f"Order not found: {order_id}")
-            return {"code": 0}
-
-        # Обрабатываем успешную оплату
-        if status == "Completed":
-            # Проверяем что заказ еще не оплачен (избегаем дублей)
-            should_award_cashback = order.status != OrderStatus.PAID
-
-            order.status = OrderStatus.PAID
-            if order.payment:
-                order.payment.status = PaymentStatus.PAID
-                # Сохраняем transaction_id в extra поле
-                if transaction_id:
-                    order.payment.extra = {"transaction_id": transaction_id}
-
-            db.commit()
-
-            # Начисляем бонусы
-            if should_award_cashback:
-                try:
-                    points_awarded = loyalty_service.award_cashback_for_order(db, order)
-                    logger.info(f"Awarded {points_awarded} cashback points for order {order_id}")
-                except Exception as e:
-                    logger.error(f"Failed to award cashback for order {order_id}: {e}")
-
-            logger.info(f"Order {order_id} marked as PAID via CloudPayments webhook")
-
-        # Обрабатываем неудачную оплату
-        elif status == "Declined":
-            if order.payment:
-                order.payment.status = PaymentStatus.FAILED
-            db.commit()
-            logger.info(f"Order {order_id} payment declined")
-
-        # Обрабатываем возврат
-        elif status == "Refunded":
-            if order.payment:
-                order.payment.status = PaymentStatus.CANCELLED
-            order.status = OrderStatus.CANCELLED
-            db.commit()
-            logger.info(f"Order {order_id} refunded")
-
-        # CloudPayments требует {"code": 0} для успеха
-        return {"code": 0}
-
-    except Exception as e:
-        logger.error(f"CloudPayments webhook error: {e}")
-        # Возвращаем успех чтобы не ломать поток платежей
-        return {"code": 0}
-
